@@ -215,7 +215,7 @@
   <div class="card">
     <h2>第一步 · 粘贴数据</h2>
     <textarea class="paste-area" id="pasteArea"
-      placeholder="从 Excel 或 CSV 复制数据后，直接在此处 Ctrl+V 粘贴&#10;&#10;支持格式：&#10;  - Excel 复制的表格（制表符分隔）&#10;  - CSV 文本（逗号分隔）&#10;&#10;第一行必须为表头，例如：订单ID、买家ID、金额"></textarea>
+      placeholder="从 Excel 或 CSV 复制数据后，直接在此处 Ctrl+V 粘贴&#10;&#10;支持格式：&#10;  - Excel 复制的表格（制表符分隔）&#10;  - CSV 文本（逗号分隔）&#10;&#10;第一行必须为表头，例如：订单ID、买家ID、用户昵称、金额"></textarea>
     <p class="tip" id="fileName"></p>
   </div>
 
@@ -230,6 +230,10 @@
       <div>
         <label>买家 ID 对应列</label>
         <select id="colBuyerId"></select>
+      </div>
+      <div>
+        <label>用户昵称对应列</label>
+        <select id="colNickname"></select>
       </div>
       <div>
         <label>订单金额对应列</label>
@@ -342,17 +346,18 @@
     }
 
     function populateMapping() {
-      ['colOrderId','colBuyerId','colAmount'].forEach(id => {
+      ['colOrderId','colBuyerId','colNickname','colAmount'].forEach(id => {
         const sel = document.getElementById(id);
         sel.innerHTML = headers.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join('');
       });
       // smart defaults
-      autoSelect('colOrderId', ['订单id','order_id','订单号','orderid','order id','单号']);
-      autoSelect('colBuyerId', ['买家id','buyer_id','用户id','userid','买家','buyerid','buyer id','用户','会员id']);
-      autoSelect('colAmount',  ['金额','订单金额','amount','price','付款金额','实付金额','支付金额']);
+      autoSelect('colOrderId',  ['订单id','order_id','订单号','orderid','order id','单号']);
+      autoSelect('colBuyerId',  ['买家id','buyer_id','用户id','userid','买家','buyerid','buyer id','用户','会员id']);
+      autoSelect('colNickname', ['昵称','nickname','用户昵称','买家昵称','nick','name','姓名','用户名']);
+      autoSelect('colAmount',   ['金额','订单金额','amount','price','付款金额','实付金额','支付金额']);
 
       document.getElementById('mappingCard').classList.remove('hidden');
-      ['colOrderId','colBuyerId','colAmount'].forEach(id =>
+      ['colOrderId','colBuyerId','colNickname','colAmount'].forEach(id =>
         document.getElementById(id).addEventListener('change', refreshPreview)
       );
       refreshPreview();
@@ -368,9 +373,10 @@
     }
 
     function refreshPreview() {
-      const colBuyer = document.getElementById('colBuyerId').value;
-      const colOrder = document.getElementById('colOrderId').value;
-      const colAmt   = document.getElementById('colAmount').value;
+      const colBuyer    = document.getElementById('colBuyerId').value;
+      const colOrder    = document.getElementById('colOrderId').value;
+      const colNickname = document.getElementById('colNickname').value;
+      const colAmt      = document.getElementById('colAmount').value;
 
       // 统计唯一买家数（仅用于展示）
       const uniqueBuyers = new Set(rawRows.map(r => String(r[colBuyer]).trim()).filter(Boolean));
@@ -385,11 +391,12 @@
       // preview table（显示原始数据，前50行）
       const preview = rawRows.slice(0, 50);
       document.getElementById('previewHead').innerHTML =
-        [colOrder, colBuyer, colAmt].map(h => `<th>${esc(h)}</th>`).join('');
+        [colOrder, colBuyer, colNickname, colAmt].map(h => `<th>${esc(h)}</th>`).join('');
       document.getElementById('previewBody').innerHTML =
         preview.map(r => `<tr>
           <td>${esc(String(r[colOrder]))}</td>
           <td>${esc(String(r[colBuyer]))}</td>
+          <td>${esc(String(r[colNickname]))}</td>
           <td>${esc(String(r[colAmt]))}</td>
         </tr>`).join('');
 
@@ -409,9 +416,10 @@
     document.getElementById('redrawBtn').addEventListener('click', doDraw);
 
     function doDraw() {
-      const colBuyer = document.getElementById('colBuyerId').value;
-      const colOrder = document.getElementById('colOrderId').value;
-      const colAmt   = document.getElementById('colAmount').value;
+      const colBuyer    = document.getElementById('colBuyerId').value;
+      const colOrder    = document.getElementById('colOrderId').value;
+      const colNickname = document.getElementById('colNickname').value;
+      const colAmt      = document.getElementById('colAmount').value;
 
       // 抽奖时对买家去重：同一买家保留第一条订单
       const seen = new Set();
@@ -434,9 +442,11 @@
         const card = document.createElement('div');
         card.className = 'winner-card';
         card.style.animationDelay = (i * 80) + 'ms';
+        const nickname = String(w[colNickname]).trim();
         card.innerHTML = `
           <div class="winner-rank">&#127881; 第 ${i+1} 名</div>
-          <div class="winner-buyer">买家：${esc(String(w[colBuyer]))}</div>
+          <div class="winner-buyer">${nickname ? esc(nickname) : '买家：' + esc(String(w[colBuyer]))}</div>
+          ${nickname ? `<div class="winner-order" style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：${esc(String(w[colBuyer]))}</div>` : ''}
           <div class="winner-order">订单：${esc(String(w[colOrder]))}</div>
           <div class="winner-amount">金额：${esc(String(w[colAmt]))}</div>
         `;
@@ -449,23 +459,24 @@
 
       // store for export
       document.getElementById('exportBtn')._winners = winners;
-      document.getElementById('exportBtn')._cols = { colBuyer, colOrder, colAmt };
+      document.getElementById('exportBtn')._cols = { colBuyer, colOrder, colNickname, colAmt };
     }
 
     document.getElementById('exportBtn').addEventListener('click', function() {
       const w = this._winners;
-      const { colBuyer, colOrder, colAmt } = this._cols;
+      const { colBuyer, colOrder, colNickname, colAmt } = this._cols;
       if (!w) return;
 
       // 手动构造单元格，ID 列强制为字符串类型，防止大数末尾被截断成 000
-      const headers = ['名次', '买家ID', '订单ID', '订单金额'];
+      const hdrs = ['名次', '用户昵称', '买家ID', '订单ID', '订单金额'];
       const ws = {};
-      headers.forEach((h, c) => {
+      hdrs.forEach((h, c) => {
         ws[XLSX.utils.encode_cell({r: 0, c})] = { t: 's', v: h };
       });
       w.forEach((r, rowIdx) => {
         const cells = [
           { t: 'n', v: rowIdx + 1 },                      // 名次：数字
+          { t: 's', v: String(r[colNickname]) },           // 用户昵称：字符串
           { t: 's', v: String(r[colBuyer]) },              // 买家ID：强制字符串
           { t: 's', v: String(r[colOrder]) },              // 订单ID：强制字符串
           { t: 's', v: String(r[colAmt]) }                 // 金额：字符串保留原始值
@@ -474,7 +485,7 @@
           ws[XLSX.utils.encode_cell({r: rowIdx + 1, c})] = cell;
         });
       });
-      ws['!ref'] = XLSX.utils.encode_range({s: {r:0,c:0}, e: {r: w.length, c: 3}});
+      ws['!ref'] = XLSX.utils.encode_range({s: {r:0,c:0}, e: {r: w.length, c: 4}});
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '中奖名单');
