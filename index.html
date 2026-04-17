@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+  <!DOCTYPE html>
   <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -150,7 +150,7 @@
         try {
           const delim = text.split('\n')[0].includes('\t') ? '\t' : ',';
           const data = parseDelimited(text, delim);
-          el.textContent = `已识别 ${data.length-1} 行数据（${delim==='\t'?'Tab/Excel格式':'CSV格式'}）`;
+          el.textContent = '已识别 ' + (data.length-1) + ' 行数据（' + (delim==='\t'?'Tab/Excel格式':'CSV格式') + '）';
           parseData(data);
         } catch(err) { showError('解析失败：'+err.message); }
       }
@@ -163,7 +163,7 @@
         autoSelect('colOrderId',  ['订单id','order_id','订单号','orderid','单号']);
         autoSelect('colBuyerId',  ['买家id','buyer_id','用户id','userid','买家','用户','会员id']);
         autoSelect('colNickname', ['昵称','nickname','用户昵称','买家昵称','姓名','用户名']);
-        autoSelect('colAmount',   ['金额','订单金额','amount','price','付款金额','实付金额']);
+        autoSelect('colAmount',   ['金额','订单金额','amount','price','付款金额','实付金额','支付金额']);
         document.getElementById('mappingCard').classList.remove('hidden');
         ['colOrderId','colBuyerId','colNickname','colAmount'].forEach(id =>
   document.getElementById(id).addEventListener('change', refreshPreview));
@@ -181,28 +181,38 @@
         return new Set(rawRows.map(r=>String(r[col]).trim()).filter(Boolean));
       }
 
+      function getDrawCount() {
+        const el = document.getElementById('drawCount');
+        return Math.max(1, parseInt(el ? el.value : '10') || 10);
+      }
+
       function refreshPreview() {
         const colBuyer=document.getElementById('colBuyerId').value,
   colOrder=document.getElementById('colOrderId').value,
               colNickname=document.getElementById('colNickname').value,
   colAmt=document.getElementById('colAmount').value;
         const uniqueBuyers = getUniqueBuyers();
-        const drawCount = Math.max(1, parseInt(document.getElementById('drawCount').value)||10);
-        document.getElementById('stats').innerHTML = `
-          <div class="stat-box"><div class="num">${rawRows.length.toLocaleString()}</div><div
-  class="label">总订单数</div></div>
-          <div class="stat-box"><div class="num">${uniqueBuyers.size.toLocaleString()}</div><div
-  class="label">去重后买家数</div></div>
-          <div class="stat-box"><div class="num">${Math.min(drawCount,uniqueBuyers.size)}</div><div
-  class="label">本次中奖名额</div></div>`;
+        const drawCount = getDrawCount();
+
+        document.getElementById('previewCard').classList.remove('hidden');
+        document.getElementById('drawCard').classList.remove('hidden');
+
+        document.getElementById('stats').innerHTML =
+          '<div class="stat-box"><div class="num">'+rawRows.length.toLocaleString()+'</div><div
+  class="label">总订单数</div></div>' +
+          '<div class="stat-box"><div class="num">'+uniqueBuyers.size.toLocaleString()+'</div><div
+  class="label">去重后买家数</div></div>' +
+          '<div class="stat-box"><div class="num">'+Math.min(drawCount,uniqueBuyers.size)+'</div><div
+  class="label">本次中奖名额</div></div>';
+
         const preview = rawRows.slice(0,50);
         document.getElementById('previewHead').innerHTML =
   [colOrder,colBuyer,colNickname,colAmt].map(h=>`<th>${esc(h)}</th>`).join('');
-        document.getElementById('previewBody').innerHTML =
-  preview.map(r=>`<tr><td>${esc(String(r[colOrder]))}</td><td>${esc(String(r[colBuyer]))}</td><td>${esc(String(r[colNick
-  name]))}</td><td>${esc(String(r[colAmt]))}</td></tr>`).join('');
-        document.getElementById('previewCard').classList.remove('hidden');
-        document.getElementById('drawCard').classList.remove('hidden');
+        document.getElementById('previewBody').innerHTML = preview.map(r=>
+          '<tr><td>'+esc(String(r[colOrder]))+'</td><td>'+esc(String(r[colBuyer]))+'</td><td>'+esc(String(r[colNickname]
+  ))+'</td><td>'+esc(String(r[colAmt]))+'</td></tr>'
+        ).join('');
+
         document.getElementById('drawBtn').disabled = uniqueBuyers.size < 1;
         updateDrawHint(uniqueBuyers.size);
       }
@@ -211,11 +221,11 @@
   refreshPreview(); });
 
       function updateDrawHint(total) {
-        const n = Math.max(1, parseInt(document.getElementById('drawCount').value)||10);
-        const actual = Math.min(n, total);
-        document.getElementById('drawCountHint').textContent = total > 0 ? (total < n ? `（买家共 ${total}
-  人，将全部中奖）` : `（将从 ${total} 人中抽取）`) : '';
-        document.getElementById('drawBtn').textContent = `开始抽奖（抽 ${actual} 人）`;
+        const n = getDrawCount(), actual = Math.min(n, total);
+        const hint = document.getElementById('drawCountHint');
+        hint.textContent = total > 0 ? (total < n ? '（买家共 '+total+' 人，将全部中奖）' : '（将从 '+total+'
+  人中抽取）') : '';
+        document.getElementById('drawBtn').textContent = '开始抽奖（抽 '+actual+' 人）';
       }
 
       document.getElementById('drawBtn').addEventListener('click', doDraw);
@@ -231,20 +241,19 @@
   seen.add(key); return true; });
         for (let i=pool.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1));
   [pool[i],pool[j]]=[pool[j],pool[i]]; }
-        const n = Math.max(1, parseInt(document.getElementById('drawCount').value)||10);
-        const winners = pool.slice(0, Math.min(n, pool.length));
+        const winners = pool.slice(0, Math.min(getDrawCount(), pool.length));
         const grid = document.getElementById('winnersGrid'); grid.innerHTML='';
         winners.forEach((w,i) => {
           const card = document.createElement('div'); card.className='winner-card';
   card.style.animationDelay=(i*80)+'ms';
           const nickname = String(w[colNickname]).trim();
-          card.innerHTML = `
-            <div class="winner-rank">&#127881; 第 ${i+1} 名</div>
-            <div class="winner-buyer">${nickname ? esc(nickname) : '买家：'+esc(String(w[colBuyer]))}</div>
-            ${nickname ? `<div class="winner-order"
-  style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：${esc(String(w[colBuyer]))}</div>` : ''}
-            <div class="winner-order">订单：${esc(String(w[colOrder]))}</div>
-            <div class="winner-amount">金额：${esc(String(w[colAmt]))}</div>`;
+          card.innerHTML =
+            '<div class="winner-rank">&#127881; 第 '+(i+1)+' 名</div>' +
+            '<div class="winner-buyer">'+(nickname ? esc(nickname) : '买家：'+esc(String(w[colBuyer])))+'</div>' +
+            (nickname ? '<div class="winner-order"
+  style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：'+esc(String(w[colBuyer]))+'</div>' : '') +
+            '<div class="winner-order">订单：'+esc(String(w[colOrder]))+'</div>' +
+            '<div class="winner-amount">金额：'+esc(String(w[colAmt]))+'</div>';
           grid.appendChild(card);
         });
         document.getElementById('winnersCard').classList.remove('hidden');
@@ -255,34 +264,35 @@
       }
 
       document.getElementById('exportBtn').addEventListener('click', function() {
-        const w=this._winners, {colBuyer,colOrder,colNickname,colAmt}=this._cols; if(!w) return;
+        const w=this._winners, c=this._cols; if(!w) return;
         const hdrs=['名次','用户昵称','买家ID','订单ID','订单金额'], ws={};
-        hdrs.forEach((h,c)=>{ ws[XLSX.utils.encode_cell({r:0,c})]={t:'s',v:h}; });
+        hdrs.forEach((h,i)=>{ ws[XLSX.utils.encode_cell({r:0,c:i})]={t:'s',v:h}; });
         w.forEach((r,ri)=>{
-          [{t:'n',v:ri+1},{t:'s',v:String(r[colNickname])},{t:'s',v:String(r[colBuyer])},{t:'s',v:String(r[colOrder])},{
-  t:'s',v:String(r[colAmt])}]
-            .forEach((cell,c)=>{ ws[XLSX.utils.encode_cell({r:ri+1,c})]=cell; });
+          [{t:'n',v:ri+1},{t:'s',v:String(r[c.colNickname])},{t:'s',v:String(r[c.colBuyer])},{t:'s',v:String(r[c.colOrde
+  r])},{t:'s',v:String(r[c.colAmt])}]
+            .forEach((cell,i)=>{ ws[XLSX.utils.encode_cell({r:ri+1,c:i})]=cell; });
         });
         ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:w.length,c:4}});
         const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'中奖名单');
   XLSX.writeFile(wb,'中奖名单.xlsx');
       });
 
-      function esc(str) { return
-  str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+      function esc(s) { return
+  String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
       function launchConfetti() {
         const canvas=document.getElementById('confetti'), ctx=canvas.getContext('2d');
         canvas.width=window.innerWidth; canvas.height=window.innerHeight;
-        const pieces=Array.from({length:120},()=>({x:Math.random()*canvas.width,y:-20,w:6+Math.random()*8,h:10+Math.rand
-  om()*6,color:`hsl(${Math.random()*60+30},90%,60%)`,vx:(Math.random()-0.5)*4,vy:2+Math.random()*3,rot:Math.random()*360
-  ,vr:(Math.random()-0.5)*8}));
+        const
+  pieces=Array.from({length:120},()=>({x:Math.random()*canvas.width,y:-20,w:6+Math.random()*8,h:10+Math.random()*6,
+          color:`hsl(${Math.random()*60+30},90%,60%)`,vx:(Math.random()-0.5)*4,vy:2+Math.random()*3,rot:Math.random()*36
+  0,vr:(Math.random()-0.5)*8}));
         let frame;
         function draw() {
           ctx.clearRect(0,0,canvas.width,canvas.height); let alive=false;
-          pieces.forEach(p=>{ p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr; if(p.y<canvas.height+20) alive=true; ctx.save();ctx.trans
-  late(p.x,p.y);ctx.rotate(p.rot*Math.PI/180);ctx.fillStyle=p.color;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.restore();
-  });
+          pieces.forEach(p=>{ p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr; if(p.y<canvas.height+20) alive=true;
+            ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot*Math.PI/180);ctx.fillStyle=p.color;ctx.fillRect(-p.w/2,-p
+  .h/2,p.w,p.h);ctx.restore(); });
           if(alive) frame=requestAnimationFrame(draw); else ctx.clearRect(0,0,canvas.width,canvas.height);
         }
         cancelAnimationFrame(frame); draw();
