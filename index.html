@@ -1,538 +1,292 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>抽奖工具</title>
-  <script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+ <!DOCTYPE html>
+  <html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>抽奖工具</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: linear-gradient(135deg, #1a1a2e 0%,
+  #16213e 50%, #0f3460 100%); min-height: 100vh; color: #e0e0e0; padding: 24px; }
+      h1 { text-align: center; font-size: 2rem; color: #f0c040; letter-spacing: 4px; margin-bottom: 32px; text-shadow: 0
+   0 20px rgba(240,192,64,0.5); }
+      .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding:
+   24px; margin-bottom: 24px; backdrop-filter: blur(10px); }
+      .card h2 { font-size: 1rem; color: #a0b4c8; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 2px; }
+      .paste-area { width: 100%; min-height: 160px; background: rgba(255,255,255,0.04); border: 2px solid
+  rgba(240,192,64,0.3); border-radius: 12px; padding: 16px; color: #e0e0e0; font-size: 0.85rem; font-family:
+  "Consolas","Courier New",monospace; resize: vertical; outline: none; transition: border-color 0.2s; line-height: 1.6;
+  }
+      .paste-area:focus { border-color: #f0c040; }
+      .paste-area::placeholder { color: rgba(160,180,200,0.5); }
+      .stats { display: flex; gap: 16px; flex-wrap: wrap; }
+      .stat-box { flex: 1; min-width: 120px; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 16px;
+  text-align: center; }
+      .stat-box .num { font-size: 2rem; font-weight: bold; color: #f0c040; }
+      .stat-box .label { font-size: 0.8rem; color: #a0b4c8; margin-top: 4px; }
+      .mapping { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+      .mapping label { font-size: 0.85rem; color: #a0b4c8; margin-bottom: 4px; display: block; }
+      .mapping select { width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.08); border: 1px solid
+  rgba(255,255,255,0.15); border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; cursor: pointer; }
+      .mapping select:focus { outline: none; border-color: #f0c040; }
+      .mapping select option { background: #1a1a2e; }
+      .table-wrap { max-height: 240px; overflow-y: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
+      table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+      thead th { background: rgba(240,192,64,0.15); color: #f0c040; padding: 10px 14px; text-align: left; position:
+  sticky; top: 0; }
+      tbody tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+      tbody td { padding: 8px 14px; color: #ccc; border-bottom: 1px solid rgba(255,255,255,0.04); }
+      .draw-btn { display: block; width: 100%; padding: 16px; background: linear-gradient(90deg, #f0c040, #e07820);
+  border: none; border-radius: 12px; color: #1a1a2e; font-size: 1.2rem; font-weight: bold; letter-spacing: 4px; cursor:
+  pointer; transition: all 0.3s; }
+      .draw-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(240,192,64,0.4); }
+      .draw-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+      .winners-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+      .winner-card { background: linear-gradient(135deg, rgba(240,192,64,0.1), rgba(224,120,32,0.1)); border: 1px solid
+  rgba(240,192,64,0.3); border-radius: 12px; padding: 16px; animation: pop 0.4s ease forwards; opacity: 0; }
+      @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      .winner-rank { font-size: 1.4rem; font-weight: bold; color: #f0c040; margin-bottom: 6px; }
+      .winner-buyer { font-size: 1rem; color: #fff; word-break: break-all; }
+      .winner-order { font-size: 0.75rem; color: #a0b4c8; margin-top: 4px; }
+      .winner-amount { font-size: 0.75rem; color: #a0b4c8; }
+      .export-btn { display: inline-block; margin-top: 16px; padding: 10px 24px; background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; cursor: pointer;
+  transition: all 0.2s; }
+      .export-btn:hover { background: rgba(255,255,255,0.15); }
+      .hidden { display: none !important; }
+      .tip { font-size: 0.8rem; color: #a0b4c8; margin-top: 8px; }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+      #confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; }
+    </style>
+  </head>
+  <body>
+    <canvas id="confetti"></canvas>
+    <h1>&#127881; 幸运抽奖</h1>
 
-    body {
-      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-      min-height: 100vh;
-      color: #e0e0e0;
-      padding: 24px;
-    }
+    <div class="card">
+      <h2>第一步 · 粘贴数据</h2>
+      <textarea class="paste-area" id="pasteArea" placeholder="从 Excel 或 CSV 复制数据后，直接在此处 Ctrl+V
+  粘贴&#10;&#10;第一行必须为表头，例如：订单ID、买家ID、用户昵称、金额"></textarea>
+      <p class="tip" id="fileName"></p>
+    </div>
 
-    h1 {
-      text-align: center;
-      font-size: 2rem;
-      color: #f0c040;
-      letter-spacing: 4px;
-      margin-bottom: 32px;
-      text-shadow: 0 0 20px rgba(240,192,64,0.5);
-    }
-
-    .card {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 24px;
-      backdrop-filter: blur(10px);
-    }
-
-    .card h2 {
-      font-size: 1rem;
-      color: #a0b4c8;
-      margin-bottom: 16px;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-    }
-
-    /* Paste area */
-    .paste-area {
-      width: 100%;
-      min-height: 160px;
-      background: rgba(255,255,255,0.04);
-      border: 2px solid rgba(240,192,64,0.3);
-      border-radius: 12px;
-      padding: 16px;
-      color: #e0e0e0;
-      font-size: 0.85rem;
-      font-family: "Consolas", "Courier New", monospace;
-      resize: vertical;
-      outline: none;
-      transition: border-color 0.2s;
-      line-height: 1.6;
-    }
-    .paste-area:focus { border-color: #f0c040; }
-    .paste-area::placeholder { color: rgba(160,180,200,0.5); }
-
-    /* Stats */
-    .stats {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-    .stat-box {
-      flex: 1;
-      min-width: 120px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 10px;
-      padding: 16px;
-      text-align: center;
-    }
-    .stat-box .num {
-      font-size: 2rem;
-      font-weight: bold;
-      color: #f0c040;
-    }
-    .stat-box .label {
-      font-size: 0.8rem;
-      color: #a0b4c8;
-      margin-top: 4px;
-    }
-
-    /* Column mapping */
-    .mapping {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-    }
-    .mapping label { font-size: 0.85rem; color: #a0b4c8; margin-bottom: 4px; display: block; }
-    .mapping select {
-      width: 100%;
-      padding: 8px 12px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 8px;
-      color: #e0e0e0;
-      font-size: 0.9rem;
-      cursor: pointer;
-    }
-    .mapping select:focus { outline: none; border-color: #f0c040; }
-    .mapping select option { background: #1a1a2e; }
-
-    /* Preview table */
-    .table-wrap {
-      max-height: 240px;
-      overflow-y: auto;
-      border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.08);
-    }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    thead th {
-      background: rgba(240,192,64,0.15);
-      color: #f0c040;
-      padding: 10px 14px;
-      text-align: left;
-      position: sticky;
-      top: 0;
-    }
-    tbody tr:nth-child(even) { background: rgba(255,255,255,0.03); }
-    tbody td { padding: 8px 14px; color: #ccc; border-bottom: 1px solid rgba(255,255,255,0.04); }
-
-    /* Draw button */
-    .draw-btn {
-      display: block;
-      width: 100%;
-      padding: 16px;
-      background: linear-gradient(90deg, #f0c040, #e07820);
-      border: none;
-      border-radius: 12px;
-      color: #1a1a2e;
-      font-size: 1.2rem;
-      font-weight: bold;
-      letter-spacing: 4px;
-      cursor: pointer;
-      transition: all 0.3s;
-      text-transform: uppercase;
-    }
-    .draw-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(240,192,64,0.4);
-    }
-    .draw-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    /* Winners */
-    .winners-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 16px;
-    }
-    .winner-card {
-      background: linear-gradient(135deg, rgba(240,192,64,0.1), rgba(224,120,32,0.1));
-      border: 1px solid rgba(240,192,64,0.3);
-      border-radius: 12px;
-      padding: 16px;
-      animation: pop 0.4s ease forwards;
-      opacity: 0;
-    }
-    @keyframes pop {
-      from { transform: scale(0.8); opacity: 0; }
-      to   { transform: scale(1);   opacity: 1; }
-    }
-    .winner-rank {
-      font-size: 1.4rem;
-      font-weight: bold;
-      color: #f0c040;
-      margin-bottom: 6px;
-    }
-    .winner-buyer { font-size: 1rem; color: #fff; word-break: break-all; }
-    .winner-order { font-size: 0.75rem; color: #a0b4c8; margin-top: 4px; }
-    .winner-amount { font-size: 0.75rem; color: #a0b4c8; }
-
-    /* Export button */
-    .export-btn {
-      display: inline-block;
-      margin-top: 16px;
-      padding: 10px 24px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 8px;
-      color: #e0e0e0;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .export-btn:hover { background: rgba(255,255,255,0.15); }
-
-    .hidden { display: none !important; }
-
-    .tip {
-      font-size: 0.8rem;
-      color: #a0b4c8;
-      margin-top: 8px;
-    }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
-
-    /* Confetti canvas */
-    #confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; }
-  </style>
-</head>
-<body>
-  <canvas id="confetti"></canvas>
-  <h1>&#127881; 幸运抽奖</h1>
-
-  <!-- Paste -->
-  <div class="card">
-    <h2>第一步 · 粘贴数据</h2>
-    <textarea class="paste-area" id="pasteArea"
-      placeholder="从 Excel 或 CSV 复制数据后，直接在此处 Ctrl+V 粘贴&#10;&#10;支持格式：&#10;  - Excel 复制的表格（制表符分隔）&#10;  - CSV 文本（逗号分隔）&#10;&#10;第一行必须为表头，例如：订单ID、买家ID、用户昵称、金额"></textarea>
-    <p class="tip" id="fileName"></p>
-  </div>
-
-  <!-- Column mapping -->
-  <div class="card hidden" id="mappingCard">
-    <h2>第二步 · 对应列名</h2>
-    <div class="mapping">
-      <div>
-        <label>订单 ID 对应列</label>
-        <select id="colOrderId"></select>
+    <div class="card hidden" id="mappingCard">
+      <h2>第二步 · 对应列名</h2>
+      <div class="mapping">
+        <div><label>订单 ID 对应列</label><select id="colOrderId"></select></div>
+        <div><label>买家 ID 对应列</label><select id="colBuyerId"></select></div>
+        <div><label>用户昵称对应列</label><select id="colNickname"></select></div>
+        <div><label>订单金额对应列</label><select id="colAmount"></select></div>
       </div>
-      <div>
-        <label>买家 ID 对应列</label>
-        <select id="colBuyerId"></select>
-      </div>
-      <div>
-        <label>用户昵称对应列</label>
-        <select id="colNickname"></select>
-      </div>
-      <div>
-        <label>订单金额对应列</label>
-        <select id="colAmount"></select>
+      <p class="tip" style="margin-top:12px">* 抽奖时将按买家 ID
+  自动去重，同一买家无论有多少笔订单，仅有一次中奖机会</p>
+    </div>
+
+    <div class="card hidden" id="previewCard">
+      <h2>第三步 · 数据预览</h2>
+      <div class="stats" id="stats"></div>
+      <div class="table-wrap" style="margin-top:16px">
+        <table><thead><tr id="previewHead"></tr></thead><tbody id="previewBody"></tbody></table>
       </div>
     </div>
-    <p class="tip" style="margin-top:12px">* 抽奖时将按买家 ID 自动去重，同一买家无论有多少笔订单，仅有一次中奖机会</p>
-  </div>
 
-  <!-- Preview & stats -->
-  <div class="card hidden" id="previewCard">
-    <h2>第三步 · 数据预览</h2>
-    <div class="stats" id="stats"></div>
-    <div class="table-wrap" style="margin-top:16px">
-      <table id="previewTable">
-        <thead><tr id="previewHead"></tr></thead>
-        <tbody id="previewBody"></tbody>
-      </table>
+    <div class="card hidden" id="drawCard">
+      <h2>第四步 · 开始抽奖</h2>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <label style="color:#a0b4c8;font-size:0.9rem;white-space:nowrap">抽取人数</label>
+        <input id="drawCount" type="number" min="1" value="10"
+          style="width:100px;padding:8px 12px;background:rgba(255,255,255,0.08);border:1px solid
+  rgba(255,255,255,0.15);border-radius:8px;color:#e0e0e0;font-size:1rem;text-align:center;outline:none;" />
+        <span style="color:#a0b4c8;font-size:0.85rem" id="drawCountHint"></span>
+      </div>
+      <button class="draw-btn" id="drawBtn" disabled>开始抽奖</button>
     </div>
-  </div>
 
-  <!-- Draw -->
-  <div class="card hidden" id="drawCard">
-    <h2>第四步 · 开始抽奖</h2>
-    <button class="draw-btn" id="drawBtn" disabled>开始抽奖</button>
-  </div>
-
-  <!-- Winners -->
-  <div class="card hidden" id="winnersCard">
-    <h2>&#127881; 中奖名单</h2>
-    <div class="winners-grid" id="winnersGrid"></div>
-    <div>
-      <button class="export-btn" id="exportBtn">导出中奖名单 (Excel)</button>
-      <button class="export-btn" id="redrawBtn" style="margin-left:8px">重新抽取</button>
+    <div class="card hidden" id="winnersCard">
+      <h2>&#127881; 中奖名单</h2>
+      <div class="winners-grid" id="winnersGrid"></div>
+      <div>
+        <button class="export-btn" id="exportBtn">导出中奖名单 (Excel)</button>
+        <button class="export-btn" id="redrawBtn" style="margin-left:8px">重新抽取</button>
+      </div>
     </div>
-  </div>
 
-  <script>
-    let rawRows = [];      // all parsed rows (objects)
-    let headers = [];
-    let dedupedRows = [];  // unique by buyer id
+    <script>
+      let rawRows = [], headers = [];
+      const pasteArea = document.getElementById('pasteArea');
+      pasteArea.addEventListener('paste', e => { setTimeout(() => handlePaste(pasteArea.value), 0); });
+      pasteArea.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) handlePaste(pasteArea.value); });
 
-    const pasteArea = document.getElementById('pasteArea');
+      function showError(msg) { const el = document.getElementById('fileName'); el.style.color = '#ff6b6b';
+  el.textContent = '错误：' + msg; }
 
-    pasteArea.addEventListener('paste', e => {
-      // 让默认粘贴先完成，再读取内容
-      setTimeout(() => handlePaste(pasteArea.value), 0);
-    });
+      function parseData(data) {
+        if (data.length < 2) { showError('数据为空或格式不正确'); return; }
+        headers = data[0].map(String);
+        rawRows = data.slice(1).map(row => { const obj = {}; headers.forEach((h,i) => obj[h] = row[i] ?? ''); return
+  obj; }).filter(r => headers.some(h => r[h] !== ''));
+        if (rawRows.length === 0) { showError('解析后数据为空'); return; }
+        populateMapping();
+      }
 
-    // 手动输入后按 Ctrl+Enter 也可触发解析
-    pasteArea.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && e.ctrlKey) handlePaste(pasteArea.value);
-    });
-
-    function showError(msg) {
-      const el = document.getElementById('fileName');
-      el.style.color = '#ff6b6b';
-      el.textContent = '错误：' + msg;
-    }
-
-    function parseData(data) {
-      if (data.length < 2) { showError('文件数据为空或格式不正确'); return; }
-      headers = data[0].map(String);
-      rawRows = data.slice(1).map(row => {
-        const obj = {};
-        headers.forEach((h, i) => obj[h] = row[i] ?? '');
-        return obj;
-      }).filter(r => headers.some(h => r[h] !== ''));
-      if (rawRows.length === 0) { showError('解析后数据为空，请检查文件格式'); return; }
-      populateMapping();
-    }
-
-    // 通用分隔符解析器（支持带引号字段）
-    function parseDelimited(text, delim) {
-      const rows = [];
-      let row = [], field = '', inQuote = false;
-      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      for (let i = 0; i < text.length; i++) {
-        const ch = text[i];
-        if (inQuote) {
-          if (ch === '"') {
-            if (text[i+1] === '"') { field += '"'; i++; }
-            else inQuote = false;
-          } else field += ch;
-        } else {
-          if (ch === '"') { inQuote = true; }
-          else if (text.startsWith(delim, i)) { row.push(field.trim()); field = ''; i += delim.length - 1; }
-          else if (ch === '\n') { row.push(field.trim()); rows.push(row); row = []; field = ''; }
-          else field += ch;
+      function parseDelimited(text, delim) {
+        const rows = []; let row = [], field = '', inQuote = false;
+        text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          if (inQuote) { if (ch==='"') { if(text[i+1]==='"'){field+='"';i++;}else inQuote=false; } else field+=ch; }
+          else { if(ch==='"') inQuote=true; else
+  if(text.startsWith(delim,i)){row.push(field.trim());field='';i+=delim.length-1;} else
+  if(ch==='\n'){row.push(field.trim());rows.push(row);row=[];field='';} else field+=ch; }
         }
+        row.push(field.trim()); if(row.some(f=>f!=='')) rows.push(row); return rows;
       }
-      row.push(field.trim());
-      if (row.some(f => f !== '')) rows.push(row);
-      return rows;
-    }
 
-    function handlePaste(text) {
-      const el = document.getElementById('fileName');
-      el.style.color = '#a0b4c8';
-      text = text.trim();
-      if (!text) return;
-      try {
-        // 自动检测分隔符：制表符（Excel复制）或逗号（CSV）
-        const firstLine = text.split('\n')[0];
-        const delimiter = firstLine.includes('\t') ? '\t' : ',';
-        const data = parseDelimited(text, delimiter);
-        el.textContent = `已识别 ${data.length - 1} 行数据（分隔符：${delimiter === '\t' ? 'Tab（Excel格式）' : '逗号（CSV格式）'}）`;
-        parseData(data);
-      } catch(err) { showError('解析失败：' + err.message); }
-    }
-
-    function populateMapping() {
-      ['colOrderId','colBuyerId','colNickname','colAmount'].forEach(id => {
-        const sel = document.getElementById(id);
-        sel.innerHTML = headers.map(h => `<option value="${esc(h)}">${esc(h)}</option>`).join('');
-      });
-      // smart defaults
-      autoSelect('colOrderId',  ['订单id','order_id','订单号','orderid','order id','单号']);
-      autoSelect('colBuyerId',  ['买家id','buyer_id','用户id','userid','买家','buyerid','buyer id','用户','会员id']);
-      autoSelect('colNickname', ['昵称','nickname','用户昵称','买家昵称','nick','name','姓名','用户名']);
-      autoSelect('colAmount',   ['金额','订单金额','amount','price','付款金额','实付金额','支付金额']);
-
-      document.getElementById('mappingCard').classList.remove('hidden');
-      ['colOrderId','colBuyerId','colNickname','colAmount'].forEach(id =>
-        document.getElementById(id).addEventListener('change', refreshPreview)
-      );
-      refreshPreview();
-    }
-
-    function autoSelect(selId, keywords) {
-      const sel = document.getElementById(selId);
-      const lc = headers.map(h => h.toLowerCase());
-      for (const kw of keywords) {
-        const idx = lc.findIndex(h => h.includes(kw.toLowerCase()));
-        if (idx !== -1) { sel.selectedIndex = idx; return; }
+      function handlePaste(text) {
+        const el = document.getElementById('fileName'); el.style.color='#a0b4c8'; text=text.trim(); if(!text) return;
+        try {
+          const delim = text.split('\n')[0].includes('\t') ? '\t' : ',';
+          const data = parseDelimited(text, delim);
+          el.textContent = `已识别 ${data.length-1} 行数据（${delim==='\t'?'Tab/Excel格式':'CSV格式'}）`;
+          parseData(data);
+        } catch(err) { showError('解析失败：'+err.message); }
       }
-    }
 
-    function refreshPreview() {
-      const colBuyer    = document.getElementById('colBuyerId').value;
-      const colOrder    = document.getElementById('colOrderId').value;
-      const colNickname = document.getElementById('colNickname').value;
-      const colAmt      = document.getElementById('colAmount').value;
-
-      // 统计唯一买家数（仅用于展示）
-      const uniqueBuyers = new Set(rawRows.map(r => String(r[colBuyer]).trim()).filter(Boolean));
-
-      // stats
-      document.getElementById('stats').innerHTML = `
-        <div class="stat-box"><div class="num">${rawRows.length.toLocaleString()}</div><div class="label">总订单数</div></div>
-        <div class="stat-box"><div class="num">${uniqueBuyers.size.toLocaleString()}</div><div class="label">去重后买家数</div></div>
-        <div class="stat-box"><div class="num">${Math.min(10, uniqueBuyers.size)}</div><div class="label">本次中奖名额</div></div>
-      `;
-
-      // preview table（显示原始数据，前50行）
-      const preview = rawRows.slice(0, 50);
-      document.getElementById('previewHead').innerHTML =
-        [colOrder, colBuyer, colNickname, colAmt].map(h => `<th>${esc(h)}</th>`).join('');
-      document.getElementById('previewBody').innerHTML =
-        preview.map(r => `<tr>
-          <td>${esc(String(r[colOrder]))}</td>
-          <td>${esc(String(r[colBuyer]))}</td>
-          <td>${esc(String(r[colNickname]))}</td>
-          <td>${esc(String(r[colAmt]))}</td>
-        </tr>`).join('');
-
-      document.getElementById('previewCard').classList.remove('hidden');
-      document.getElementById('drawCard').classList.remove('hidden');
-
-      const btn = document.getElementById('drawBtn');
-      btn.disabled = uniqueBuyers.size < 1;
-      if (uniqueBuyers.size < 10) {
-        btn.textContent = `开始抽奖（共 ${uniqueBuyers.size} 位买家，全部中奖）`;
-      } else {
-        btn.textContent = '开始抽奖';
-      }
-    }
-
-    document.getElementById('drawBtn').addEventListener('click', doDraw);
-    document.getElementById('redrawBtn').addEventListener('click', doDraw);
-
-    function doDraw() {
-      const colBuyer    = document.getElementById('colBuyerId').value;
-      const colOrder    = document.getElementById('colOrderId').value;
-      const colNickname = document.getElementById('colNickname').value;
-      const colAmt      = document.getElementById('colAmount').value;
-
-      // 抽奖时对买家去重：同一买家保留第一条订单
-      const seen = new Set();
-      const pool = rawRows.filter(r => {
-        const key = String(r[colBuyer]).trim();
-        if (!key || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      // Fisher-Yates shuffle, pick first 10
-      for (let i = pool.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pool[i], pool[j]] = [pool[j], pool[i]];
-      }
-      const winners = pool.slice(0, Math.min(10, pool.length));
-
-      const grid = document.getElementById('winnersGrid');
-      grid.innerHTML = '';
-      winners.forEach((w, i) => {
-        const card = document.createElement('div');
-        card.className = 'winner-card';
-        card.style.animationDelay = (i * 80) + 'ms';
-        const nickname = String(w[colNickname]).trim();
-        card.innerHTML = `
-          <div class="winner-rank">&#127881; 第 ${i+1} 名</div>
-          <div class="winner-buyer">${nickname ? esc(nickname) : '买家：' + esc(String(w[colBuyer]))}</div>
-          ${nickname ? `<div class="winner-order" style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：${esc(String(w[colBuyer]))}</div>` : ''}
-          <div class="winner-order">订单：${esc(String(w[colOrder]))}</div>
-          <div class="winner-amount">金额：${esc(String(w[colAmt]))}</div>
-        `;
-        grid.appendChild(card);
-      });
-
-      document.getElementById('winnersCard').classList.remove('hidden');
-      document.getElementById('winnersCard').scrollIntoView({ behavior: 'smooth' });
-      launchConfetti();
-
-      // store for export
-      document.getElementById('exportBtn')._winners = winners;
-      document.getElementById('exportBtn')._cols = { colBuyer, colOrder, colNickname, colAmt };
-    }
-
-    document.getElementById('exportBtn').addEventListener('click', function() {
-      const w = this._winners;
-      const { colBuyer, colOrder, colNickname, colAmt } = this._cols;
-      if (!w) return;
-
-      // 手动构造单元格，ID 列强制为字符串类型，防止大数末尾被截断成 000
-      const hdrs = ['名次', '用户昵称', '买家ID', '订单ID', '订单金额'];
-      const ws = {};
-      hdrs.forEach((h, c) => {
-        ws[XLSX.utils.encode_cell({r: 0, c})] = { t: 's', v: h };
-      });
-      w.forEach((r, rowIdx) => {
-        const cells = [
-          { t: 'n', v: rowIdx + 1 },                      // 名次：数字
-          { t: 's', v: String(r[colNickname]) },           // 用户昵称：字符串
-          { t: 's', v: String(r[colBuyer]) },              // 买家ID：强制字符串
-          { t: 's', v: String(r[colOrder]) },              // 订单ID：强制字符串
-          { t: 's', v: String(r[colAmt]) }                 // 金额：字符串保留原始值
-        ];
-        cells.forEach((cell, c) => {
-          ws[XLSX.utils.encode_cell({r: rowIdx + 1, c})] = cell;
+      function populateMapping() {
+        ['colOrderId','colBuyerId','colNickname','colAmount'].forEach(id => {
+          document.getElementById(id).innerHTML = headers.map(h=>`<option
+  value="${esc(h)}">${esc(h)}</option>`).join('');
         });
-      });
-      ws['!ref'] = XLSX.utils.encode_range({s: {r:0,c:0}, e: {r: w.length, c: 4}});
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, '中奖名单');
-      XLSX.writeFile(wb, '中奖名单.xlsx');
-    });
-
-    function esc(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    // ---- Confetti ----
-    function launchConfetti() {
-      const canvas = document.getElementById('confetti');
-      const ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      const pieces = Array.from({length: 120}, () => ({
-        x: Math.random() * canvas.width,
-        y: -20,
-        w: 6 + Math.random() * 8,
-        h: 10 + Math.random() * 6,
-        color: `hsl(${Math.random()*60+30},90%,60%)`,
-        vx: (Math.random()-0.5)*4,
-        vy: 2 + Math.random()*3,
-        rot: Math.random()*360,
-        vr: (Math.random()-0.5)*8
-      }));
-      let frame;
-      function draw() {
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        let alive = false;
-        pieces.forEach(p => {
-          p.x += p.vx; p.y += p.vy; p.rot += p.vr;
-          if (p.y < canvas.height + 20) alive = true;
-          ctx.save();
-          ctx.translate(p.x, p.y);
-          ctx.rotate(p.rot * Math.PI/180);
-          ctx.fillStyle = p.color;
-          ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
-          ctx.restore();
-        });
-        if (alive) frame = requestAnimationFrame(draw);
-        else ctx.clearRect(0,0,canvas.width,canvas.height);
+        autoSelect('colOrderId',  ['订单id','order_id','订单号','orderid','单号']);
+        autoSelect('colBuyerId',  ['买家id','buyer_id','用户id','userid','买家','用户','会员id']);
+        autoSelect('colNickname', ['昵称','nickname','用户昵称','买家昵称','姓名','用户名']);
+        autoSelect('colAmount',   ['金额','订单金额','amount','price','付款金额','实付金额']);
+        document.getElementById('mappingCard').classList.remove('hidden');
+        ['colOrderId','colBuyerId','colNickname','colAmount'].forEach(id =>
+  document.getElementById(id).addEventListener('change', refreshPreview));
+        refreshPreview();
       }
-      cancelAnimationFrame(frame);
-      draw();
-    }
-  </script>
-</body>
-</html>
+
+      function autoSelect(selId, keywords) {
+        const sel = document.getElementById(selId), lc = headers.map(h=>h.toLowerCase());
+        for (const kw of keywords) { const idx = lc.findIndex(h=>h.includes(kw.toLowerCase()));
+  if(idx!==-1){sel.selectedIndex=idx;return;} }
+      }
+
+      function getUniqueBuyers() {
+        const col = document.getElementById('colBuyerId').value;
+        return new Set(rawRows.map(r=>String(r[col]).trim()).filter(Boolean));
+      }
+
+      function refreshPreview() {
+        const colBuyer=document.getElementById('colBuyerId').value,
+  colOrder=document.getElementById('colOrderId').value,
+              colNickname=document.getElementById('colNickname').value,
+  colAmt=document.getElementById('colAmount').value;
+        const uniqueBuyers = getUniqueBuyers();
+        const drawCount = Math.max(1, parseInt(document.getElementById('drawCount').value)||10);
+        document.getElementById('stats').innerHTML = `
+          <div class="stat-box"><div class="num">${rawRows.length.toLocaleString()}</div><div
+  class="label">总订单数</div></div>
+          <div class="stat-box"><div class="num">${uniqueBuyers.size.toLocaleString()}</div><div
+  class="label">去重后买家数</div></div>
+          <div class="stat-box"><div class="num">${Math.min(drawCount,uniqueBuyers.size)}</div><div
+  class="label">本次中奖名额</div></div>`;
+        const preview = rawRows.slice(0,50);
+        document.getElementById('previewHead').innerHTML =
+  [colOrder,colBuyer,colNickname,colAmt].map(h=>`<th>${esc(h)}</th>`).join('');
+        document.getElementById('previewBody').innerHTML =
+  preview.map(r=>`<tr><td>${esc(String(r[colOrder]))}</td><td>${esc(String(r[colBuyer]))}</td><td>${esc(String(r[colNick
+  name]))}</td><td>${esc(String(r[colAmt]))}</td></tr>`).join('');
+        document.getElementById('previewCard').classList.remove('hidden');
+        document.getElementById('drawCard').classList.remove('hidden');
+        document.getElementById('drawBtn').disabled = uniqueBuyers.size < 1;
+        updateDrawHint(uniqueBuyers.size);
+      }
+
+      document.getElementById('drawCount').addEventListener('input', () => { updateDrawHint(getUniqueBuyers().size);
+  refreshPreview(); });
+
+      function updateDrawHint(total) {
+        const n = Math.max(1, parseInt(document.getElementById('drawCount').value)||10);
+        const actual = Math.min(n, total);
+        document.getElementById('drawCountHint').textContent = total > 0 ? (total < n ? `（买家共 ${total}
+  人，将全部中奖）` : `（将从 ${total} 人中抽取）`) : '';
+        document.getElementById('drawBtn').textContent = `开始抽奖（抽 ${actual} 人）`;
+      }
+
+      document.getElementById('drawBtn').addEventListener('click', doDraw);
+      document.getElementById('redrawBtn').addEventListener('click', doDraw);
+
+      function doDraw() {
+        const colBuyer=document.getElementById('colBuyerId').value,
+  colOrder=document.getElementById('colOrderId').value,
+              colNickname=document.getElementById('colNickname').value,
+  colAmt=document.getElementById('colAmount').value;
+        const seen = new Set();
+        const pool = rawRows.filter(r => { const key=String(r[colBuyer]).trim(); if(!key||seen.has(key)) return false;
+  seen.add(key); return true; });
+        for (let i=pool.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1));
+  [pool[i],pool[j]]=[pool[j],pool[i]]; }
+        const n = Math.max(1, parseInt(document.getElementById('drawCount').value)||10);
+        const winners = pool.slice(0, Math.min(n, pool.length));
+        const grid = document.getElementById('winnersGrid'); grid.innerHTML='';
+        winners.forEach((w,i) => {
+          const card = document.createElement('div'); card.className='winner-card';
+  card.style.animationDelay=(i*80)+'ms';
+          const nickname = String(w[colNickname]).trim();
+          card.innerHTML = `
+            <div class="winner-rank">&#127881; 第 ${i+1} 名</div>
+            <div class="winner-buyer">${nickname ? esc(nickname) : '买家：'+esc(String(w[colBuyer]))}</div>
+            ${nickname ? `<div class="winner-order"
+  style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：${esc(String(w[colBuyer]))}</div>` : ''}
+            <div class="winner-order">订单：${esc(String(w[colOrder]))}</div>
+            <div class="winner-amount">金额：${esc(String(w[colAmt]))}</div>`;
+          grid.appendChild(card);
+        });
+        document.getElementById('winnersCard').classList.remove('hidden');
+        document.getElementById('winnersCard').scrollIntoView({behavior:'smooth'});
+        launchConfetti();
+        document.getElementById('exportBtn')._winners = winners;
+        document.getElementById('exportBtn')._cols = {colBuyer,colOrder,colNickname,colAmt};
+      }
+
+      document.getElementById('exportBtn').addEventListener('click', function() {
+        const w=this._winners, {colBuyer,colOrder,colNickname,colAmt}=this._cols; if(!w) return;
+        const hdrs=['名次','用户昵称','买家ID','订单ID','订单金额'], ws={};
+        hdrs.forEach((h,c)=>{ ws[XLSX.utils.encode_cell({r:0,c})]={t:'s',v:h}; });
+        w.forEach((r,ri)=>{
+          [{t:'n',v:ri+1},{t:'s',v:String(r[colNickname])},{t:'s',v:String(r[colBuyer])},{t:'s',v:String(r[colOrder])},{
+  t:'s',v:String(r[colAmt])}]
+            .forEach((cell,c)=>{ ws[XLSX.utils.encode_cell({r:ri+1,c})]=cell; });
+        });
+        ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:w.length,c:4}});
+        const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'中奖名单');
+  XLSX.writeFile(wb,'中奖名单.xlsx');
+      });
+
+      function esc(str) { return
+  str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+      function launchConfetti() {
+        const canvas=document.getElementById('confetti'), ctx=canvas.getContext('2d');
+        canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+        const pieces=Array.from({length:120},()=>({x:Math.random()*canvas.width,y:-20,w:6+Math.random()*8,h:10+Math.rand
+  om()*6,color:`hsl(${Math.random()*60+30},90%,60%)`,vx:(Math.random()-0.5)*4,vy:2+Math.random()*3,rot:Math.random()*360
+  ,vr:(Math.random()-0.5)*8}));
+        let frame;
+        function draw() {
+          ctx.clearRect(0,0,canvas.width,canvas.height); let alive=false;
+          pieces.forEach(p=>{ p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr; if(p.y<canvas.height+20) alive=true; ctx.save();ctx.trans
+  late(p.x,p.y);ctx.rotate(p.rot*Math.PI/180);ctx.fillStyle=p.color;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.restore();
+  });
+          if(alive) frame=requestAnimationFrame(draw); else ctx.clearRect(0,0,canvas.width,canvas.height);
+        }
+        cancelAnimationFrame(frame); draw();
+      }
+    </script>
+  </body>
+  </html>
