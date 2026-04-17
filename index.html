@@ -1,368 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>抽奖工具</title>
+  <script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #e0e0e0; padding: 24px; }
+    h1 { text-align: center; font-size: 2rem; color: #f0c040; letter-spacing: 4px; margin-bottom: 32px; text-shadow: 0 0 20px rgba(240,192,64,0.5); }
+    .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; margin-bottom: 24px; backdrop-filter: blur(10px); }
+    .card h2 { font-size: 1rem; color: #a0b4c8; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 2px; }
+    .paste-area { width: 100%; min-height: 160px; background: rgba(255,255,255,0.04); border: 2px solid rgba(240,192,64,0.3); border-radius: 12px; padding: 16px; color: #e0e0e0; font-size: 0.85rem; font-family: "Consolas","Courier New",monospace; resize: vertical; outline: none; transition: border-color 0.2s; line-height: 1.6; }
+    .paste-area:focus { border-color: #f0c040; }
+    .paste-area::placeholder { color: rgba(160,180,200,0.5); }
+    .stats { display: flex; gap: 16px; flex-wrap: wrap; }
+    .stat-box { flex: 1; min-width: 120px; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 16px; text-align: center; }
+    .stat-box .num { font-size: 2rem; font-weight: bold; color: #f0c040; }
+    .stat-box .label { font-size: 0.8rem; color: #a0b4c8; margin-top: 4px; }
+    .mapping { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .mapping label { font-size: 0.85rem; color: #a0b4c8; margin-bottom: 4px; display: block; }
+    .mapping select { width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; cursor: pointer; }
+    .mapping select:focus { outline: none; border-color: #f0c040; }
+    .mapping select option { background: #1a1a2e; }
+    .table-wrap { max-height: 240px; overflow-y: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead th { background: rgba(240,192,64,0.15); color: #f0c040; padding: 10px 14px; text-align: left; position: sticky; top: 0; }
+    tbody tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+    tbody td { padding: 8px 14px; color: #ccc; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .draw-btn { display: block; width: 100%; padding: 16px; background: linear-gradient(90deg, #f0c040, #e07820); border: none; border-radius: 12px; color: #1a1a2e; font-size: 1.2rem; font-weight: bold; letter-spacing: 4px; cursor: pointer; transition: all 0.3s; }
+    .draw-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(240,192,64,0.4); }
+    .draw-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .winners-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .winner-card { background: linear-gradient(135deg, rgba(240,192,64,0.1), rgba(224,120,32,0.1)); border: 1px solid rgba(240,192,64,0.3); border-radius: 12px; padding: 16px; animation: pop 0.4s ease forwards; opacity: 0; }
+    @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .winner-rank { font-size: 1.4rem; font-weight: bold; color: #f0c040; margin-bottom: 6px; }
+    .winner-buyer { font-size: 1rem; color: #fff; word-break: break-all; }
+    .winner-order { font-size: 0.75rem; color: #a0b4c8; margin-top: 4px; }
+    .winner-amount { font-size: 0.75rem; color: #a0b4c8; }
+    .export-btn { display: inline-block; margin-top: 16px; padding: 10px 24px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; }
+    .export-btn:hover { background: rgba(255,255,255,0.15); }
+    .hidden { display: none !important; }
+    .tip { font-size: 0.8rem; color: #a0b4c8; margin-top: 8px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+    #confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; }
+  </style>
+</head>
+<body>
+  <canvas id="confetti"></canvas>
+  <h1>&#127881; 幸运抽奖</h1>
 
-  <!DOCTYPE html>
-  <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>抽奖工具</title>
-    <script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: linear-gradient(135deg, #1a1a2e 0%,
-  #16213e 50%, #0f3460 100%); min-height: 100vh; color: #e0e0e0; padding: 24px; }
-      h1 { text-align: center; font-size: 2rem; color: #f0c040; letter-spacing: 4px; margin-bottom: 32px; text-shadow: 0
-   0 20px rgba(240,192,64,0.5); }
-      .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding:
-   24px; margin-bottom: 24px; backdrop-filter: blur(10px); }
-      .card h2 { font-size: 1rem; color: #a0b4c8; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 2px; }
-      .paste-area { width: 100%; min-height: 160px; background: rgba(255,255,255,0.04); border: 2px solid
-  rgba(240,192,64,0.3); border-radius: 12px; padding: 16px; color: #e0e0e0; font-size: 0.85rem; font-family:
-  "Consolas","Courier New",monospace; resize: vertical; outline: none; transition: border-color 0.2s; line-height: 1.6;
-  }
-      .paste-area:focus { border-color: #f0c040; }
-      .paste-area::placeholder { color: rgba(160,180,200,0.5); }
-      .stats { display: flex; gap: 16px; flex-wrap: wrap; }
-      .stat-box { flex: 1; min-width: 120px; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 16px;
-  text-align: center; }
-      .stat-box .num { font-size: 2rem; font-weight: bold; color: #f0c040; }
-      .stat-box .label { font-size: 0.8rem; color: #a0b4c8; margin-top: 4px; }
-      .mapping { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-      .mapping label { font-size: 0.85rem; color: #a0b4c8; margin-bottom: 4px; display: block; }
-      .mapping select { width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.08); border: 1px solid
-  rgba(255,255,255,0.15); border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; cursor: pointer; }
-      .mapping select:focus { outline: none; border-color: #f0c040; }
-      .mapping select option { background: #1a1a2e; }
-      .table-wrap { max-height: 240px; overflow-y: auto; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
-      table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-      thead th { background: rgba(240,192,64,0.15); color: #f0c040; padding: 10px 14px; text-align: left; position:
-  sticky; top: 0; }
-      tbody tr:nth-child(even) { background: rgba(255,255,255,0.03); }
-      tbody td { padding: 8px 14px; color: #ccc; border-bottom: 1px solid rgba(255,255,255,0.04); }
-      .draw-btn { display: block; width: 100%; padding: 16px; background: linear-gradient(90deg, #f0c040, #e07820);
-  border: none; border-radius: 12px; color: #1a1a2e; font-size: 1.2rem; font-weight: bold; letter-spacing: 4px; cursor:
-  pointer; transition: all 0.3s; }
-      .draw-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(240,192,64,0.4); }
-      .draw-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-      .winners-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
-      .winner-card { background: linear-gradient(135deg, rgba(240,192,64,0.1), rgba(224,120,32,0.1)); border: 1px solid
-  rgba(240,192,64,0.3); border-radius: 12px; padding: 16px; animation: pop 0.4s ease forwards; opacity: 0; }
-      @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-      .winner-rank { font-size: 1.4rem; font-weight: bold; color: #f0c040; margin-bottom: 6px; }
-      .winner-buyer { font-size: 1rem; color: #fff; word-break: break-all; }
-      .winner-order { font-size: 0.75rem; color: #a0b4c8; margin-top: 4px; }
-      .winner-amount { font-size: 0.75rem; color: #a0b4c8; }
-      .export-btn { display: inline-block; margin-top: 16px; padding: 10px 24px; background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; cursor: pointer;
-  transition: all 0.2s; }
-      .export-btn:hover { background: rgba(255,255,255,0.15); }
-      .hidden { display: none !important; }
-      .tip { font-size: 0.8rem; color: #a0b4c8; margin-top: 8px; }
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
-      #confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; }
-    </style>
-  </head>
-  <body>
-    <canvas id="confetti"></canvas>
-    <h1>&#127881; 幸运抽奖</h1>
+  <div class="card">
+    <h2>第一步 · 粘贴数据</h2>
+    <textarea class="paste-area" id="pasteArea" placeholder="从 Excel 或 CSV 复制数据后，直接在此处 Ctrl+V 粘贴&#10;&#10;第一行必须为表头，例如：订单ID、买家ID、用户昵称、金额"></textarea>
+    <p class="tip" id="fileName"></p>
+  </div>
 
-    <div class="card">
-      <h2>第一步 · 粘贴数据</h2>
-      <textarea class="paste-area" id="pasteArea" placeholder="从 Excel 或 CSV 复制数据后，直接在此处 Ctrl+V
-  粘贴&#10;&#10;第一行必须为表头，例如：订单ID、买家ID、用户昵称、金额"></textarea>
-      <p class="tip" id="fileName"></p>
+  <div class="card hidden" id="mappingCard">
+    <h2>第二步 · 对应列名</h2>
+    <div class="mapping">
+      <div><label>订单 ID 对应列</label><select id="colOrderId"></select></div>
+      <div><label>买家 ID 对应列</label><select id="colBuyerId"></select></div>
+      <div><label>用户昵称对应列</label><select id="colNickname"></select></div>
+      <div><label>订单金额对应列</label><select id="colAmount"></select></div>
     </div>
+    <p class="tip" style="margin-top:12px">* 抽奖时将按买家 ID 自动去重，同一买家无论有多少笔订单，仅有一次中奖机会</p>
+  </div>
 
-    <div class="card hidden" id="mappingCard">
-      <h2>第二步 · 对应列名</h2>
-      <div class="mapping">
-        <div><label>订单 ID 对应列</label><select id="colOrderId"></select></div>
-        <div><label>买家 ID 对应列</label><select id="colBuyerId"></select></div>
-        <div><label>用户昵称对应列</label><select id="colNickname"></select></div>
-        <div><label>订单金额对应列</label><select id="colAmount"></select></div>
-      </div>
-      <p class="tip" style="margin-top:12px">* 抽奖时将按买家 ID
-  自动去重，同一买家无论有多少笔订单，仅有一次中奖机会</p>
+  <div class="card hidden" id="previewCard">
+    <h2>第三步 · 数据预览</h2>
+    <div class="stats" id="stats"></div>
+    <div class="table-wrap" style="margin-top:16px">
+      <table><thead><tr id="previewHead"></tr></thead><tbody id="previewBody"></tbody></table>
     </div>
+  </div>
 
-    <div class="card hidden" id="previewCard">
-      <h2>第三步 · 数据预览</h2>
-      <div class="stats" id="stats"></div>
-      <div class="table-wrap" style="margin-top:16px">
-        <table><thead><tr id="previewHead"></tr></thead><tbody id="previewBody"></tbody></table>
-      </div>
+  <div class="card hidden" id="drawCard">
+    <h2>第四步 · 开始抽奖</h2>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <label style="color:#a0b4c8;font-size:0.9rem;white-space:nowrap">抽取人数</label>
+      <input id="drawCount" type="number" min="1" value="10" style="width:100px;padding:8px 12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#e0e0e0;font-size:1rem;text-align:center;outline:none;" />
+      <span style="color:#a0b4c8;font-size:0.85rem" id="drawCountHint"></span>
     </div>
+    <button class="draw-btn" id="drawBtn" disabled>开始抽奖</button>
+  </div>
 
-    <div class="card hidden" id="drawCard">
-      <h2>第四步 · 开始抽奖</h2>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-        <label style="color:#a0b4c8;font-size:0.9rem;white-space:nowrap">抽取人数</label>
-        <input id="drawCount" type="number" min="1" value="10" style="width:100px;padding:8px
-  12px;background:rgba(255,255,255,0.08);border:1px solid
-  rgba(255,255,255,0.15);border-radius:8px;color:#e0e0e0;font-size:1rem;text-align:center;outline:none;" />
-        <span style="color:#a0b4c8;font-size:0.85rem" id="drawCountHint"></span>
-      </div>
-      <button class="draw-btn" id="drawBtn" disabled>开始抽奖</button>
+  <div class="card hidden" id="winnersCard">
+    <h2>&#127881; 中奖名单</h2>
+    <div class="winners-grid" id="winnersGrid"></div>
+    <div>
+      <button class="export-btn" id="exportBtn">导出中奖名单 (Excel)</button>
+      <button class="export-btn" id="redrawBtn" style="margin-left:8px">重新抽取</button>
     </div>
+  </div>
 
-    <div class="card hidden" id="winnersCard">
-      <h2>&#127881; 中奖名单</h2>
-      <div class="winners-grid" id="winnersGrid"></div>
-      <div>
-        <button class="export-btn" id="exportBtn">导出中奖名单 (Excel)</button>
-        <button class="export-btn" id="redrawBtn" style="margin-left:8px">重新抽取</button>
-      </div>
-    </div>
+  <script>
+    var rawRows = [], headers = [];
+    var pasteArea = document.getElementById('pasteArea');
 
-    <script>
-      var rawRows = [], headers = [];
-      var pasteArea = document.getElementById('pasteArea');
-      pasteArea.addEventListener('paste', function() { setTimeout(function(){ handlePaste(pasteArea.value); }, 0); });
-      pasteArea.addEventListener('keydown', function(e){ if(e.key==='Enter' && e.ctrlKey) handlePaste(pasteArea.value);
-  });
+    pasteArea.addEventListener('paste', function() {
+      setTimeout(function() { handlePaste(pasteArea.value); }, 0);
+    });
+    pasteArea.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && e.ctrlKey) handlePaste(pasteArea.value);
+    });
 
-      function showError(msg) {
-        var el = document.getElementById('fileName');
-        el.style.color = '#ff6b6b';
-        el.textContent = '错误：' + msg;
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function getDrawCount() {
+      var el = document.getElementById('drawCount');
+      return Math.max(1, parseInt(el ? el.value : '10') || 10);
+    }
+
+    function getUniqueBuyers() {
+      var col = document.getElementById('colBuyerId').value;
+      var set = new Set();
+      for (var i = 0; i < rawRows.length; i++) {
+        var v = String(rawRows[i][col]).trim();
+        if (v) set.add(v);
       }
+      return set;
+    }
 
-      function esc(s) {
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-      }
+    function showError(msg) {
+      var el = document.getElementById('fileName');
+      el.style.color = '#ff6b6b';
+      el.textContent = '错误：' + msg;
+    }
 
-      function getDrawCount() {
-        var el = document.getElementById('drawCount');
-        return Math.max(1, parseInt(el ? el.value : '10') || 10);
-      }
-
-      function getUniqueBuyers() {
-        var col = document.getElementById('colBuyerId').value;
-        var set = new Set();
-        rawRows.forEach(function(r){ var v = String(r[col]).trim(); if(v) set.add(v); });
-        return set;
-      }
-
-      function parseDelimited(text, delim) {
-        var rows = [], row = [], field = '', inQuote = false;
-        text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-        for (var i = 0; i < text.length; i++) {
-          var ch = text[i];
-          if (inQuote) {
-            if (ch==='"') { if(text[i+1]==='"'){field+='"';i++;}else{inQuote=false;} } else { field+=ch; }
+    function parseDelimited(text, delim) {
+      var rows = [], row = [], field = '', inQuote = false;
+      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      for (var i = 0; i < text.length; i++) {
+        var ch = text[i];
+        if (inQuote) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') { field += '"'; i++; }
+            else { inQuote = false; }
           } else {
-            if (ch==='"') { inQuote=true; }
-            else if (text.indexOf(delim,i)===i) { row.push(field.trim()); field=''; i+=delim.length-1; }
-            else if (ch==='\n') { row.push(field.trim()); rows.push(row); row=[]; field=''; }
-            else { field+=ch; }
+            field += ch;
+          }
+        } else {
+          if (ch === '"') {
+            inQuote = true;
+          } else if (text.indexOf(delim, i) === i) {
+            row.push(field.trim()); field = ''; i += delim.length - 1;
+          } else if (ch === '\n') {
+            row.push(field.trim()); rows.push(row); row = []; field = '';
+          } else {
+            field += ch;
           }
         }
-        row.push(field.trim());
-        if (row.some(function(f){return f!=='';})) rows.push(row);
-        return rows;
       }
+      row.push(field.trim());
+      var hasContent = false;
+      for (var k = 0; k < row.length; k++) { if (row[k] !== '') { hasContent = true; break; } }
+      if (hasContent) rows.push(row);
+      return rows;
+    }
 
-      function handlePaste(text) {
-        var el = document.getElementById('fileName');
-        el.style.color = '#a0b4c8';
-        text = text.trim();
-        if (!text) return;
-        try {
-          var firstLine = text.split('\n')[0];
-          var delim = firstLine.indexOf('\t') !== -1 ? '\t' : ',';
-          var data = parseDelimited(text, delim);
-          el.textContent = '已识别 ' + (data.length-1) + ' 行数据（' + (delim==='\t' ? 'Tab/Excel格式' : 'CSV格式') +
-  '）';
-          parseData(data);
-        } catch(err) { showError('解析失败：' + err.message); }
+    function handlePaste(text) {
+      var el = document.getElementById('fileName');
+      el.style.color = '#a0b4c8';
+      text = text.trim();
+      if (!text) return;
+      try {
+        var firstLine = text.split('\n')[0];
+        var delim = firstLine.indexOf('\t') !== -1 ? '\t' : ',';
+        var data = parseDelimited(text, delim);
+        var fmt = delim === '\t' ? 'Tab/Excel格式' : 'CSV格式';
+        el.textContent = '已识别 ' + (data.length - 1) + ' 行数据（' + fmt + '）';
+        parseData(data);
+      } catch (err) {
+        showError('解析失败：' + err.message);
       }
+    }
 
-      function parseData(data) {
-        if (data.length < 2) { showError('数据为空或格式不正确'); return; }
-        headers = data[0].map(String);
-        rawRows = [];
-        for (var i = 1; i < data.length; i++) {
-          var obj = {};
-          headers.forEach(function(h, idx){ obj[h] = data[i][idx] !== undefined ? data[i][idx] : ''; });
-          if (headers.some(function(h){ return obj[h] !== ''; })) rawRows.push(obj);
+    function parseData(data) {
+      if (data.length < 2) { showError('数据为空或格式不正确'); return; }
+      headers = data[0].map(String);
+      rawRows = [];
+      for (var i = 1; i < data.length; i++) {
+        var obj = {};
+        for (var j = 0; j < headers.length; j++) {
+          obj[headers[j]] = data[i][j] !== undefined ? data[i][j] : '';
         }
-        if (rawRows.length === 0) { showError('解析后数据为空'); return; }
-        populateMapping();
+        var hasVal = false;
+        for (var j = 0; j < headers.length; j++) { if (obj[headers[j]] !== '') { hasVal = true; break; } }
+        if (hasVal) rawRows.push(obj);
       }
+      if (rawRows.length === 0) { showError('解析后数据为空'); return; }
+      populateMapping();
+    }
 
-      function populateMapping() {
-        ['colOrderId','colBuyerId','colNickname','colAmount'].forEach(function(id) {
-          var html = '';
-          headers.forEach(function(h){ html += '<option value="' + esc(h) + '">' + esc(h) + '</option>'; });
-          document.getElementById(id).innerHTML = html;
-        });
-        autoSelect('colOrderId',  ['订单id','order_id','订单号','orderid','单号']);
-        autoSelect('colBuyerId',  ['买家id','buyer_id','用户id','userid','买家','用户','会员id']);
-        autoSelect('colNickname', ['昵称','nickname','用户昵称','买家昵称','姓名','用户名']);
-        autoSelect('colAmount',   ['金额','订单金额','amount','price','付款金额','实付金额','支付金额']);
-        document.getElementById('mappingCard').classList.remove('hidden');
-        ['colOrderId','colBuyerId','colNickname','colAmount'].forEach(function(id){
-          document.getElementById(id).addEventListener('change', refreshPreview);
-        });
-        refreshPreview();
+    function populateMapping() {
+      var ids = ['colOrderId', 'colBuyerId', 'colNickname', 'colAmount'];
+      for (var i = 0; i < ids.length; i++) {
+        var html = '';
+        for (var j = 0; j < headers.length; j++) {
+          html += '<option value="' + esc(headers[j]) + '">' + esc(headers[j]) + '</option>';
+        }
+        document.getElementById(ids[i]).innerHTML = html;
       }
+      autoSelect('colOrderId',  ['订单id', 'order_id', '订单号', 'orderid', '单号']);
+      autoSelect('colBuyerId',  ['买家id', 'buyer_id', '用户id', 'userid', '买家', '用户', '会员id']);
+      autoSelect('colNickname', ['昵称', 'nickname', '用户昵称', '买家昵称', '姓名', '用户名']);
+      autoSelect('colAmount',   ['金额', '订单金额', 'amount', 'price', '付款金额', '实付金额', '支付金额']);
+      document.getElementById('mappingCard').classList.remove('hidden');
+      var changeIds = ['colOrderId', 'colBuyerId', 'colNickname', 'colAmount'];
+      for (var i = 0; i < changeIds.length; i++) {
+        document.getElementById(changeIds[i]).addEventListener('change', refreshPreview);
+      }
+      refreshPreview();
+    }
 
-      function autoSelect(selId, keywords) {
-        var sel = document.getElementById(selId);
-        var lc = headers.map(function(h){ return h.toLowerCase(); });
-        for (var i = 0; i < keywords.length; i++) {
-          var idx = lc.findIndex(function(h){ return h.indexOf(keywords[i].toLowerCase()) !== -1; });
-          if (idx !== -1) { sel.selectedIndex = idx; return; }
+    function autoSelect(selId, keywords) {
+      var sel = document.getElementById(selId);
+      var lc = [];
+      for (var i = 0; i < headers.length; i++) lc.push(headers[i].toLowerCase());
+      for (var k = 0; k < keywords.length; k++) {
+        for (var i = 0; i < lc.length; i++) {
+          if (lc[i].indexOf(keywords[k].toLowerCase()) !== -1) { sel.selectedIndex = i; return; }
         }
       }
+    }
 
-      function refreshPreview() {
-        var colBuyer    = document.getElementById('colBuyerId').value;
-        var colOrder    = document.getElementById('colOrderId').value;
-        var colNickname = document.getElementById('colNickname').value;
-        var colAmt      = document.getElementById('colAmount').value;
-        var uniqueBuyers = getUniqueBuyers();
-        var drawCount = getDrawCount();
+    function refreshPreview() {
+      var colBuyer    = document.getElementById('colBuyerId').value;
+      var colOrder    = document.getElementById('colOrderId').value;
+      var colNickname = document.getElementById('colNickname').value;
+      var colAmt      = document.getElementById('colAmount').value;
+      var uniqueBuyers = getUniqueBuyers();
+      var drawCount = getDrawCount();
 
-        document.getElementById('previewCard').classList.remove('hidden');
-        document.getElementById('drawCard').classList.remove('hidden');
+      document.getElementById('previewCard').classList.remove('hidden');
+      document.getElementById('drawCard').classList.remove('hidden');
 
-        document.getElementById('stats').innerHTML =
-          '<div class="stat-box"><div class="num">' + rawRows.length.toLocaleString() + '</div><div
-  class="label">总订单数</div></div>' +
-          '<div class="stat-box"><div class="num">' + uniqueBuyers.size.toLocaleString() + '</div><div
-  class="label">去重后买家数</div></div>' +
-          '<div class="stat-box"><div class="num">' + Math.min(drawCount, uniqueBuyers.size) + '</div><div
-  class="label">本次中奖名额</div></div>';
+      document.getElementById('stats').innerHTML =
+        '<div class="stat-box"><div class="num">' + rawRows.length.toLocaleString() + '</div><div class="label">总订单数</div></div>' +
+        '<div class="stat-box"><div class="num">' + uniqueBuyers.size.toLocaleString() + '</div><div class="label">去重后买家数</div></div>' +
+        '<div class="stat-box"><div class="num">' + Math.min(drawCount, uniqueBuyers.size) + '</div><div class="label">本次中奖名额</div></div>';
 
-        var headHtml = '';
-        [colOrder, colBuyer, colNickname, colAmt].forEach(function(h){ headHtml += '<th>' + esc(h) + '</th>'; });
-        document.getElementById('previewHead').innerHTML = headHtml;
+      var headHtml = '';
+      var cols = [colOrder, colBuyer, colNickname, colAmt];
+      for (var i = 0; i < cols.length; i++) headHtml += '<th>' + esc(cols[i]) + '</th>';
+      document.getElementById('previewHead').innerHTML = headHtml;
 
-        var bodyHtml = '';
-        var preview = rawRows.slice(0, 50);
-        preview.forEach(function(r){
-          bodyHtml += '<tr><td>' + esc(String(r[colOrder])) + '</td><td>' + esc(String(r[colBuyer])) + '</td><td>' +
-  esc(String(r[colNickname])) + '</td><td>' + esc(String(r[colAmt])) + '</td></tr>';
-        });
-        document.getElementById('previewBody').innerHTML = bodyHtml;
-
-        document.getElementById('drawBtn').disabled = uniqueBuyers.size < 1;
-        updateDrawHint(uniqueBuyers.size);
+      var bodyHtml = '';
+      var preview = rawRows.slice(0, 50);
+      for (var i = 0; i < preview.length; i++) {
+        var r = preview[i];
+        bodyHtml += '<tr><td>' + esc(String(r[colOrder])) + '</td><td>' + esc(String(r[colBuyer])) + '</td><td>' + esc(String(r[colNickname])) + '</td><td>' + esc(String(r[colAmt])) + '</td></tr>';
       }
+      document.getElementById('previewBody').innerHTML = bodyHtml;
 
-      document.getElementById('drawCount').addEventListener('input', function(){
-        updateDrawHint(getUniqueBuyers().size);
-        refreshPreview();
-      });
+      document.getElementById('drawBtn').disabled = uniqueBuyers.size < 1;
+      updateDrawHint(uniqueBuyers.size);
+    }
 
-      function updateDrawHint(total) {
-        var n = getDrawCount();
-        var actual = Math.min(n, total);
-        var hint = '';
-        if (total > 0) { hint = total < n ? '（买家共 ' + total + ' 人，将全部中奖）' : '（将从 ' + total + '
-  人中抽取）'; }
-        document.getElementById('drawCountHint').textContent = hint;
-        document.getElementById('drawBtn').textContent = '开始抽奖（抽 ' + actual + ' 人）';
+    document.getElementById('drawCount').addEventListener('input', function() {
+      updateDrawHint(getUniqueBuyers().size);
+      refreshPreview();
+    });
+
+    function updateDrawHint(total) {
+      var n = getDrawCount();
+      var actual = Math.min(n, total);
+      var hint = '';
+      if (total > 0) {
+        hint = total < n ? '（买家共 ' + total + ' 人，将全部中奖）' : '（将从 ' + total + ' 人中抽取）';
       }
+      document.getElementById('drawCountHint').textContent = hint;
+      document.getElementById('drawBtn').textContent = '开始抽奖（抽 ' + actual + ' 人）';
+    }
 
-      document.getElementById('drawBtn').addEventListener('click', doDraw);
-      document.getElementById('redrawBtn').addEventListener('click', doDraw);
+    document.getElementById('drawBtn').addEventListener('click', doDraw);
+    document.getElementById('redrawBtn').addEventListener('click', doDraw);
 
-      function doDraw() {
-        var colBuyer    = document.getElementById('colBuyerId').value;
-        var colOrder    = document.getElementById('colOrderId').value;
-        var colNickname = document.getElementById('colNickname').value;
-        var colAmt      = document.getElementById('colAmount').value;
-        var seen = new Set();
-        var pool = rawRows.filter(function(r){
-          var key = String(r[colBuyer]).trim();
-          if (!key || seen.has(key)) return false;
-          seen.add(key); return true;
-        });
-        for (var i = pool.length-1; i > 0; i--) {
-          var j = Math.floor(Math.random()*(i+1));
-          var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+    function doDraw() {
+      var colBuyer    = document.getElementById('colBuyerId').value;
+      var colOrder    = document.getElementById('colOrderId').value;
+      var colNickname = document.getElementById('colNickname').value;
+      var colAmt      = document.getElementById('colAmount').value;
+      var seen = new Set();
+      var pool = [];
+      for (var i = 0; i < rawRows.length; i++) {
+        var key = String(rawRows[i][colBuyer]).trim();
+        if (key && !seen.has(key)) { seen.add(key); pool.push(rawRows[i]); }
+      }
+      for (var i = pool.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+      }
+      var winners = pool.slice(0, Math.min(getDrawCount(), pool.length));
+      var grid = document.getElementById('winnersGrid');
+      grid.innerHTML = '';
+      for (var i = 0; i < winners.length; i++) {
+        var w = winners[i];
+        var card = document.createElement('div');
+        card.className = 'winner-card';
+        card.style.animationDelay = (i * 80) + 'ms';
+        var nickname = String(w[colNickname]).trim();
+        var html = '<div class="winner-rank">&#127881; 第 ' + (i + 1) + ' 名</div>';
+        if (nickname) {
+          html += '<div class="winner-buyer">' + esc(nickname) + '</div>';
+          html += '<div class="winner-order" style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：' + esc(String(w[colBuyer])) + '</div>';
+        } else {
+          html += '<div class="winner-buyer">买家：' + esc(String(w[colBuyer])) + '</div>';
         }
-        var winners = pool.slice(0, Math.min(getDrawCount(), pool.length));
-        var grid = document.getElementById('winnersGrid');
-        grid.innerHTML = '';
-        winners.forEach(function(w, i){
-          var card = document.createElement('div');
-          card.className = 'winner-card';
-          card.style.animationDelay = (i*80) + 'ms';
-          var nickname = String(w[colNickname]).trim();
-          var html = '<div class="winner-rank">&#127881; 第 ' + (i+1) + ' 名</div>';
-          html += '<div class="winner-buyer">' + (nickname ? esc(nickname) : '买家：' + esc(String(w[colBuyer]))) +
-  '</div>';
-          if (nickname) html += '<div class="winner-order" style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：' +
-   esc(String(w[colBuyer])) + '</div>';
-          html += '<div class="winner-order">订单：' + esc(String(w[colOrder])) + '</div>';
-          html += '<div class="winner-amount">金额：' + esc(String(w[colAmt])) + '</div>';
-          card.innerHTML = html;
-          grid.appendChild(card);
-        });
-        document.getElementById('winnersCard').classList.remove('hidden');
-        document.getElementById('winnersCard').scrollIntoView({behavior:'smooth'});
-        launchConfetti();
-        document.getElementById('exportBtn')._winners = winners;
-        document.getElementById('exportBtn')._cols = {colBuyer:colBuyer, colOrder:colOrder, colNickname:colNickname,
-  colAmt:colAmt};
+        html += '<div class="winner-order">订单：' + esc(String(w[colOrder])) + '</div>';
+        html += '<div class="winner-amount">金额：' + esc(String(w[colAmt])) + '</div>';
+        card.innerHTML = html;
+        grid.appendChild(card);
       }
+      document.getElementById('winnersCard').classList.remove('hidden');
+      document.getElementById('winnersCard').scrollIntoView({ behavior: 'smooth' });
+      launchConfetti();
+      document.getElementById('exportBtn')._winners = winners;
+      document.getElementById('exportBtn')._cols = { colBuyer: colBuyer, colOrder: colOrder, colNickname: colNickname, colAmt: colAmt };
+    }
 
-      document.getElementById('exportBtn').addEventListener('click', function(){
-        var w = this._winners, c = this._cols;
-        if (!w) return;
-        var hdrs = ['名次','用户昵称','买家ID','订单ID','订单金额'];
-        var ws = {};
-        hdrs.forEach(function(h,i){ ws[XLSX.utils.encode_cell({r:0,c:i})] = {t:'s',v:h}; });
-        w.forEach(function(r,ri){
-          var cells = [
-            {t:'n',v:ri+1},
-            {t:'s',v:String(r[c.colNickname])},
-            {t:'s',v:String(r[c.colBuyer])},
-            {t:'s',v:String(r[c.colOrder])},
-            {t:'s',v:String(r[c.colAmt])}
-          ];
-          cells.forEach(function(cell,i){ ws[XLSX.utils.encode_cell({r:ri+1,c:i})] = cell; });
-        });
-        ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0},e:{r:w.length,c:4}});
-        var wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, '中奖名单');
-        XLSX.writeFile(wb, '中奖名单.xlsx');
-      });
-
-      function launchConfetti() {
-        var canvas = document.getElementById('confetti');
-        var ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        var pieces = [];
-        for (var i = 0; i < 120; i++) {
-          pieces.push({
-            x: Math.random()*canvas.width, y: -20,
-            w: 6+Math.random()*8, h: 10+Math.random()*6,
-            color: 'hsl(' + Math.round(Math.random()*60+30) + ',90%,60%)',
-            vx: (Math.random()-0.5)*4, vy: 2+Math.random()*3,
-            rot: Math.random()*360, vr: (Math.random()-0.5)*8
-          });
-        }
-        var frame;
-        function draw() {
-          ctx.clearRect(0,0,canvas.width,canvas.height);
-          var alive = false;
-          pieces.forEach(function(p){
-            p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr;
-            if (p.y < canvas.height+20) alive = true;
-            ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180);
-            ctx.fillStyle = p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore();
-          });
-          if (alive) frame = requestAnimationFrame(draw);
-          else ctx.clearRect(0,0,canvas.width,canvas.height);
-        }
-        cancelAnimationFrame(frame); draw();
+    document.getElementById('exportBtn').addEventListener('click', function() {
+      var w = this._winners;
+      var c = this._cols;
+      if (!w) return;
+      var hdrs = ['名次', '用户昵称', '买家ID', '订单ID', '订单金额'];
+      var ws = {};
+      for (var i = 0; i < hdrs.length; i++) {
+        ws[XLSX.utils.encode_cell({ r: 0, c: i })] = { t: 's', v: hdrs[i] };
       }
-    </script>
-  </body>
-  </html>
+      for (var ri = 0; ri < w.length; ri++) {
+        var r = w[ri];
+        var cells = [
+          { t: 'n', v: ri + 1 },
+          { t: 's', v: String(r[c.colNickname]) },
+          { t: 's', v: String(r[c.colBuyer]) },
+          { t: 's', v: String(r[c.colOrder]) },
+          { t: 's', v: String(r[c.colAmt]) }
+        ];
+        for (var ci = 0; ci < cells.length; ci++) {
+          ws[XLSX.utils.encode_cell({ r: ri + 1, c: ci })] = cells[ci];
+        }
+      }
+      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: w.length, c: 4 } });
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '中奖名单');
+      XLSX.writeFile(wb, '中奖名单.xlsx');
+    });
+
+    function launchConfetti() {
+      var canvas = document.getElementById('confetti');
+      var ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      var pieces = [];
+      for (var i = 0; i < 120; i++) {
+        var hue = Math.round(Math.random() * 60 + 30);
+        pieces.push({
+          x: Math.random() * canvas.width, y: -20,
+          w: 6 + Math.random() * 8, h: 10 + Math.random() * 6,
+          color: 'hsl(' + hue + ',90%,60%)',
+          vx: (Math.random() - 0.5) * 4,
+          vy: 2 + Math.random() * 3,
+          rot: Math.random() * 360,
+          vr: (Math.random() - 0.5) * 8
+        });
+      }
+      var frame;
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var alive = false;
+        for (var i = 0; i < pieces.length; i++) {
+          var p = pieces[i];
+          p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+          if (p.y < canvas.height + 20) alive = true;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot * Math.PI / 180);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          ctx.restore();
+        }
+        if (alive) frame = requestAnimationFrame(draw);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      cancelAnimationFrame(frame);
+      draw();
+    }
+  </script>
+</body>
+</html>
