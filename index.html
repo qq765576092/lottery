@@ -380,9 +380,9 @@
       var val = opt ? opt.value : '';
       var lbl = document.getElementById(lblId);
       if (!val && selId === 'colOrderCount') {
-        lbl.innerHTML = fieldLabel + ' <span style="color:#a0b4c8;font-size:0.8em">(自动统计)</span>';
+        lbl.innerHTML = fieldLabel + '<span style="color:#a0b4c8;font-size:0.75em;display:block;margin-top:2px">(自动统计行数)</span>';
       } else if (val) {
-        lbl.innerHTML = fieldLabel + ' <span style="color:#f0c040;font-weight:bold">' + esc(col) + '</span>';
+        lbl.innerHTML = '<span style="color:#e8e8e8;font-weight:bold;font-size:0.95rem">' + esc(col) + '</span><span style="color:#607080;font-size:0.72em;display:block;margin-top:2px">' + esc(fieldLabel) + '</span>';
       } else {
         lbl.textContent = fieldLabel + ' 对应列';
       }
