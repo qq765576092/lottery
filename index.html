@@ -42,6 +42,9 @@
     .export-btn:hover { background: rgba(255,255,255,0.15); }
     .hidden { display: none !important; }
     .tip { font-size: 0.8rem; color: #a0b4c8; margin-top: 8px; }
+    .tier-btn { padding: 8px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #a0b4c8; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+    .tier-btn:hover { background: rgba(255,255,255,0.1); }
+    .tier-active { background: rgba(240,192,64,0.2) !important; border-color: #f0c040 !important; color: #f0c040 !important; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
@@ -61,10 +64,11 @@
   <div class="card hidden" id="mappingCard">
     <h2>第二步 · 对应列名</h2>
     <div class="mapping">
-      <div><label>订单 ID 对应列</label><select id="colOrderId"></select></div>
-      <div><label>买家 ID 对应列</label><select id="colBuyerId"></select></div>
-      <div><label>用户昵称对应列</label><select id="colNickname"></select></div>
-      <div><label>订单金额对应列</label><select id="colAmount"></select></div>
+      <div><label id="lblOrderId">订单 ID 对应列</label><select id="colOrderId"></select></div>
+      <div><label id="lblBuyerId">买家 ID 对应列</label><select id="colBuyerId"></select></div>
+      <div><label id="lblNickname">用户昵称对应列</label><select id="colNickname"></select></div>
+      <div><label id="lblAmount">订单金额对应列</label><select id="colAmount"></select></div>
+      <div><label id="lblOrderCount">订单数对应列</label><select id="colOrderCount"></select></div>
     </div>
     <p class="tip" style="margin-top:12px">* 抽奖时将按买家 ID 自动去重，同一买家无论有多少笔订单，仅有一次中奖机会</p>
   </div>
@@ -79,6 +83,14 @@
 
   <div class="card hidden" id="drawCard">
     <h2>第四步 · 开始抽奖</h2>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <label style="color:#a0b4c8;font-size:0.9rem;white-space:nowrap">奖项类型</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="tier-btn tier-active" id="tierAll">全部参与</button>
+        <button type="button" class="tier-btn" id="tier1st">&#129351; 一等奖（&#8805;10单）</button>
+        <button type="button" class="tier-btn" id="tier2nd">&#129352; 二等奖（&#8805;5单）</button>
+      </div>
+    </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <label style="color:#a0b4c8;font-size:0.9rem;white-space:nowrap">抽取人数</label>
       <input id="drawCount" type="number" min="1" value="10" style="width:100px;padding:8px 12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#e0e0e0;font-size:1rem;text-align:center;outline:none;" />
@@ -88,7 +100,7 @@
   </div>
 
   <div class="card hidden" id="winnersCard">
-    <h2>&#127881; 中奖名单</h2>
+    <h2 id="winnersTitle">&#127881; 中奖名单</h2>
     <div class="winners-grid" id="winnersGrid"></div>
     <div>
       <button class="export-btn" id="exportBtn">导出中奖名单 (Excel)</button>
@@ -98,6 +110,7 @@
 
   <script>
     var rawRows = [], headers = [];
+    var currentTier = 'all';
     var pasteArea = document.getElementById('pasteArea');
 
     pasteArea.addEventListener('paste', function() {
@@ -138,6 +151,61 @@
         if (v) set.add(v);
       }
       return set;
+    }
+
+    function getOrderCountsMap() {
+      if (!rawRows.length) return {};
+      var colBuyer = document.getElementById('colBuyerId').value;
+      var colOC = document.getElementById('colOrderCount').value;
+      var counts = {};
+      if (colOC) {
+        for (var i = 0; i < rawRows.length; i++) {
+          var key = String(rawRows[i][colBuyer]).trim();
+          if (!key) continue;
+          var val = parseInt(rawRows[i][colOC]) || 0;
+          if (counts[key] === undefined || val > counts[key]) counts[key] = val;
+        }
+      } else {
+        for (var i = 0; i < rawRows.length; i++) {
+          var key = String(rawRows[i][colBuyer]).trim();
+          if (!key) continue;
+          counts[key] = (counts[key] || 0) + 1;
+        }
+      }
+      return counts;
+    }
+
+    function getPoolForTier(tier) {
+      if (!rawRows.length) return [];
+      var colBuyer = document.getElementById('colBuyerId').value;
+      var orderCounts = getOrderCountsMap();
+      var seen = {};
+      var pool = [];
+      for (var i = 0; i < rawRows.length; i++) {
+        var key = String(rawRows[i][colBuyer]).trim();
+        if (!key || seen[key]) continue;
+        seen[key] = true;
+        var cnt = orderCounts[key] || 0;
+        if (tier === 'first' && cnt < 10) continue;
+        if (tier === 'second' && cnt < 5) continue;
+        pool.push(rawRows[i]);
+      }
+      return pool;
+    }
+
+    function selectTier(tier) {
+      currentTier = tier;
+      var btns = ['tierAll', 'tier1st', 'tier2nd'];
+      var tiers = ['all', 'first', 'second'];
+      for (var i = 0; i < btns.length; i++) {
+        var el = document.getElementById(btns[i]);
+        if (tiers[i] === tier) {
+          el.classList.add('tier-active');
+        } else {
+          el.classList.remove('tier-active');
+        }
+      }
+      if (rawRows.length > 0) refreshPreview();
     }
 
     function showError(msg) {
@@ -220,6 +288,12 @@
         }
         document.getElementById(ids[i]).innerHTML = html;
       }
+      var ocHtml = '<option value="">(自动统计行数)</option>';
+      for (var j = 0; j < headers.length; j++) {
+        ocHtml += '<option value="' + esc(headers[j]) + '">' + esc(headers[j]) + '</option>';
+      }
+      document.getElementById('colOrderCount').innerHTML = ocHtml;
+
       autoSelect('colOrderId',
         ['订单id', '订单ID', 'order_id', 'orderid', '订单号', '单号', '流水号', '交易号', '订单编号'],
         ['订单', 'order', '流水', '交易', '编号', '单号']
@@ -236,10 +310,29 @@
         ['支付金额', '实付金额', '付款金额', '订单金额', '金额', 'amount', 'price', '支付金额(元)', '实付款'],
         ['支付金额', '实付', '付款', '订单金额', '金额', 'amount', 'price', '费用', '消费']
       );
+      autoSelectOC('colOrderCount',
+        ['订单数', 'order_count', '购买次数', '消费次数', '购买数量', '下单次数'],
+        ['订单数', '次数', '购买次', '下单', 'count']
+      );
+
+      updateMappingLabel('lblOrderId', '订单 ID', 'colOrderId');
+      updateMappingLabel('lblBuyerId', '买家 ID', 'colBuyerId');
+      updateMappingLabel('lblNickname', '用户昵称', 'colNickname');
+      updateMappingLabel('lblAmount', '订单金额', 'colAmount');
+      updateMappingLabel('lblOrderCount', '订单数', 'colOrderCount');
+
       document.getElementById('mappingCard').classList.remove('hidden');
-      var changeIds = ['colOrderId', 'colBuyerId', 'colNickname', 'colAmount'];
+
+      var labelMap = { colOrderId: 'lblOrderId', colBuyerId: 'lblBuyerId', colNickname: 'lblNickname', colAmount: 'lblAmount', colOrderCount: 'lblOrderCount' };
+      var fieldName = { colOrderId: '订单 ID', colBuyerId: '买家 ID', colNickname: '用户昵称', colAmount: '订单金额', colOrderCount: '订单数' };
+      var changeIds = ['colOrderId', 'colBuyerId', 'colNickname', 'colAmount', 'colOrderCount'];
       for (var i = 0; i < changeIds.length; i++) {
-        document.getElementById(changeIds[i]).addEventListener('change', refreshPreview);
+        (function(id) {
+          document.getElementById(id).addEventListener('change', function() {
+            updateMappingLabel(labelMap[id], fieldName[id], id);
+            refreshPreview();
+          });
+        })(changeIds[i]);
       }
       refreshPreview();
     }
@@ -248,19 +341,50 @@
       var sel = document.getElementById(selId);
       var lc = [];
       for (var i = 0; i < headers.length; i++) lc.push(headers[i].toLowerCase().replace(/\s/g, ''));
-      // 第一轮：精确完整匹配
       for (var k = 0; k < exactWords.length; k++) {
         var kw = exactWords[k].toLowerCase().replace(/\s/g, '');
         for (var i = 0; i < lc.length; i++) {
           if (lc[i] === kw) { sel.selectedIndex = i; return; }
         }
       }
-      // 第二轮：包含匹配（按关键词顺序，越靠前优先级越高）
       for (var k = 0; k < fuzzyWords.length; k++) {
         var kw = fuzzyWords[k].toLowerCase().replace(/\s/g, '');
         for (var i = 0; i < lc.length; i++) {
           if (lc[i].indexOf(kw) !== -1) { sel.selectedIndex = i; return; }
         }
+      }
+    }
+
+    function autoSelectOC(selId, exactWords, fuzzyWords) {
+      var sel = document.getElementById(selId);
+      var lc = [];
+      for (var i = 0; i < headers.length; i++) lc.push(headers[i].toLowerCase().replace(/\s/g, ''));
+      for (var k = 0; k < exactWords.length; k++) {
+        var kw = exactWords[k].toLowerCase().replace(/\s/g, '');
+        for (var i = 0; i < lc.length; i++) {
+          if (lc[i] === kw) { sel.selectedIndex = i + 1; return; }
+        }
+      }
+      for (var k = 0; k < fuzzyWords.length; k++) {
+        var kw = fuzzyWords[k].toLowerCase().replace(/\s/g, '');
+        for (var i = 0; i < lc.length; i++) {
+          if (lc[i].indexOf(kw) !== -1) { sel.selectedIndex = i + 1; return; }
+        }
+      }
+    }
+
+    function updateMappingLabel(lblId, fieldLabel, selId) {
+      var sel = document.getElementById(selId);
+      var opt = sel.options[sel.selectedIndex];
+      var col = opt ? opt.text : '';
+      var val = opt ? opt.value : '';
+      var lbl = document.getElementById(lblId);
+      if (!val && selId === 'colOrderCount') {
+        lbl.innerHTML = fieldLabel + ' <span style="color:#a0b4c8;font-size:0.8em">(自动统计)</span>';
+      } else if (val) {
+        lbl.innerHTML = fieldLabel + ' <span style="color:#f0c040;font-weight:bold">' + esc(col) + '</span>';
+      } else {
+        lbl.textContent = fieldLabel + ' 对应列';
       }
     }
 
@@ -270,7 +394,12 @@
       var colNickname = document.getElementById('colNickname').value;
       var colAmt      = document.getElementById('colAmount').value;
       var uniqueBuyers = getUniqueBuyers();
-      var drawCount = getDrawCount();
+      var orderCounts = getOrderCountsMap();
+      var tier1Count = 0, tier2Count = 0;
+      for (var key in orderCounts) {
+        if (orderCounts[key] >= 10) tier1Count++;
+        if (orderCounts[key] >= 5) tier2Count++;
+      }
 
       document.getElementById('previewCard').classList.remove('hidden');
       document.getElementById('drawCard').classList.remove('hidden');
@@ -278,7 +407,8 @@
       document.getElementById('stats').innerHTML =
         '<div class="stat-box"><div class="num">' + rawRows.length.toLocaleString() + '</div><div class="label">总订单数</div></div>' +
         '<div class="stat-box"><div class="num">' + uniqueBuyers.size.toLocaleString() + '</div><div class="label">去重后买家数</div></div>' +
-        '<div class="stat-box"><div class="num">' + Math.min(drawCount, uniqueBuyers.size) + '</div><div class="label">本次中奖名额</div></div>';
+        '<div class="stat-box"><div class="num">' + tier1Count + '</div><div class="label">&#129351; 一等奖候选（&#8805;10单）</div></div>' +
+        '<div class="stat-box"><div class="num">' + tier2Count + '</div><div class="label">&#129352; 二等奖候选（&#8805;5单）</div></div>';
 
       var headHtml = '';
       var cols = [colOrder, colBuyer, colNickname, colAmt];
@@ -293,45 +423,51 @@
       }
       document.getElementById('previewBody').innerHTML = bodyHtml;
 
-      document.getElementById('drawBtn').disabled = uniqueBuyers.size < 1;
-      updateDrawHint(uniqueBuyers.size);
+      updateDrawHint();
     }
 
     document.getElementById('drawCount').addEventListener('input', function() {
-      updateDrawHint(getUniqueBuyers().size);
-      refreshPreview();
+      if (rawRows.length > 0) updateDrawHint();
     });
 
-    function updateDrawHint(total) {
+    function updateDrawHint() {
+      if (!rawRows.length) return;
+      var pool = getPoolForTier(currentTier);
+      var poolSize = pool.length;
       var n = getDrawCount();
-      var actual = Math.min(n, total);
+      var actual = Math.min(n, poolSize);
+      var tierLabel = currentTier === 'first' ? '一等奖候选人' : currentTier === 'second' ? '二等奖候选人' : '买家';
       var hint = '';
-      if (total > 0) {
-        hint = total < n ? '（买家共 ' + total + ' 人，将全部中奖）' : '（将从 ' + total + ' 人中抽取）';
+      if (poolSize > 0) {
+        hint = poolSize < n ? '（' + tierLabel + '共 ' + poolSize + ' 人，将全部中奖）' : '（将从 ' + poolSize + ' 人中抽取）';
+      } else {
+        hint = '（无符合条件的候选人）';
       }
       document.getElementById('drawCountHint').textContent = hint;
-      document.getElementById('drawBtn').textContent = '开始抽奖（抽 ' + actual + ' 人）';
+      var tierPrefix = currentTier === 'first' ? '【一等奖】' : currentTier === 'second' ? '【二等奖】' : '';
+      document.getElementById('drawBtn').textContent = tierPrefix + '开始抽奖（抽 ' + actual + ' 人）';
+      document.getElementById('drawBtn').disabled = poolSize === 0;
     }
 
     document.getElementById('drawBtn').addEventListener('click', doDraw);
     document.getElementById('redrawBtn').addEventListener('click', doDraw);
+    document.getElementById('tierAll').addEventListener('click', function() { selectTier('all'); });
+    document.getElementById('tier1st').addEventListener('click', function() { selectTier('first'); });
+    document.getElementById('tier2nd').addEventListener('click', function() { selectTier('second'); });
 
     function doDraw() {
       var colBuyer    = document.getElementById('colBuyerId').value;
       var colOrder    = document.getElementById('colOrderId').value;
       var colNickname = document.getElementById('colNickname').value;
       var colAmt      = document.getElementById('colAmount').value;
-      var seen = new Set();
-      var pool = [];
-      for (var i = 0; i < rawRows.length; i++) {
-        var key = String(rawRows[i][colBuyer]).trim();
-        if (key && !seen.has(key)) { seen.add(key); pool.push(rawRows[i]); }
-      }
+      var pool = getPoolForTier(currentTier);
       for (var i = pool.length - 1; i > 0; i--) {
         var j = Math.floor(Math.random() * (i + 1));
         var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
       }
       var winners = pool.slice(0, Math.min(getDrawCount(), pool.length));
+      var tierTitle = currentTier === 'first' ? '&#129351; 一等奖中奖名单' : currentTier === 'second' ? '&#129352; 二等奖中奖名单' : '&#127881; 中奖名单';
+      document.getElementById('winnersTitle').innerHTML = tierTitle;
       var grid = document.getElementById('winnersGrid');
       grid.innerHTML = '';
       for (var i = 0; i < winners.length; i++) {
@@ -340,7 +476,8 @@
         card.className = 'winner-card';
         card.style.animationDelay = (i * 80) + 'ms';
         var nickname = String(w[colNickname]).trim();
-        var html = '<div class="winner-rank">&#127881; 第 ' + (i + 1) + ' 名</div>';
+        var rankPrefix = currentTier === 'first' ? '&#129351; 一等奖 第 ' : currentTier === 'second' ? '&#129352; 二等奖 第 ' : '&#127881; 第 ';
+        var html = '<div class="winner-rank">' + rankPrefix + (i + 1) + ' 名</div>';
         if (nickname) {
           html += '<div class="winner-buyer">' + esc(maskName(nickname)) + '</div>';
           html += '<div class="winner-order" style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：' + esc(maskId(w[colBuyer])) + '</div>';
@@ -357,34 +494,56 @@
       launchConfetti();
       document.getElementById('exportBtn')._winners = winners;
       document.getElementById('exportBtn')._cols = { colBuyer: colBuyer, colOrder: colOrder, colNickname: colNickname, colAmt: colAmt };
+      document.getElementById('exportBtn')._tier = currentTier;
     }
 
     document.getElementById('exportBtn').addEventListener('click', function() {
       var w = this._winners;
       var c = this._cols;
+      var tier = this._tier || 'all';
       if (!w) return;
-      var hdrs = ['名次', '用户昵称', '买家ID', '订单ID', '订单金额'];
+      var hdrs, colCount, tierName;
+      if (tier === 'first') {
+        tierName = '一等奖'; hdrs = ['名次', '奖项', '用户昵称', '买家ID', '订单ID', '订单金额']; colCount = 6;
+      } else if (tier === 'second') {
+        tierName = '二等奖'; hdrs = ['名次', '奖项', '用户昵称', '买家ID', '订单ID', '订单金额']; colCount = 6;
+      } else {
+        tierName = ''; hdrs = ['名次', '用户昵称', '买家ID', '订单ID', '订单金额']; colCount = 5;
+      }
       var ws = {};
       for (var i = 0; i < hdrs.length; i++) {
         ws[XLSX.utils.encode_cell({ r: 0, c: i })] = { t: 's', v: hdrs[i] };
       }
       for (var ri = 0; ri < w.length; ri++) {
         var r = w[ri];
-        var cells = [
-          { t: 'n', v: ri + 1 },
-          { t: 's', v: String(r[c.colNickname]) },
-          { t: 's', v: String(r[c.colBuyer]) },
-          { t: 's', v: String(r[c.colOrder]) },
-          { t: 's', v: String(r[c.colAmt]) }
-        ];
+        var cells;
+        if (tierName) {
+          cells = [
+            { t: 'n', v: ri + 1 },
+            { t: 's', v: tierName },
+            { t: 's', v: String(r[c.colNickname]) },
+            { t: 's', v: String(r[c.colBuyer]) },
+            { t: 's', v: String(r[c.colOrder]) },
+            { t: 's', v: String(r[c.colAmt]) }
+          ];
+        } else {
+          cells = [
+            { t: 'n', v: ri + 1 },
+            { t: 's', v: String(r[c.colNickname]) },
+            { t: 's', v: String(r[c.colBuyer]) },
+            { t: 's', v: String(r[c.colOrder]) },
+            { t: 's', v: String(r[c.colAmt]) }
+          ];
+        }
         for (var ci = 0; ci < cells.length; ci++) {
           ws[XLSX.utils.encode_cell({ r: ri + 1, c: ci })] = cells[ci];
         }
       }
-      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: w.length, c: 4 } });
+      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: w.length, c: colCount - 1 } });
       var wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '中奖名单');
-      XLSX.writeFile(wb, '中奖名单.xlsx');
+      var fileName = tier === 'first' ? '一等奖名单.xlsx' : tier === 'second' ? '二等奖名单.xlsx' : '中奖名单.xlsx';
+      XLSX.writeFile(wb, fileName);
     });
 
     function launchConfetti() {
