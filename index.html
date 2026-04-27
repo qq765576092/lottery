@@ -44,8 +44,7 @@
     .export-btn:hover { background: rgba(255,255,255,0.15); }
     .hidden { display: none !important; }
     .tip { font-size: 0.8rem; color: #a0b4c8; margin-top: 8px; }
-    .snum { filter: blur(6px); display: inline-block; user-select: none; transition: filter 0.3s; }
-    body.show-nums .snum { filter: none; user-select: auto; }
+    .snum { display: inline-block; letter-spacing: 1px; }
     .stats-toggle-btn { font-size: 0.78rem; padding: 4px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #a0b4c8; cursor: pointer; }
     .tier-btn { padding: 8px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #a0b4c8; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
     .tier-btn:hover { background: rgba(255,255,255,0.1); }
@@ -393,10 +392,11 @@
       }
 
       document.getElementById('stats').innerHTML =
-        '<div class="stat-box"><div class="num"><span class="snum">' + rawRows.length.toLocaleString() + '</span></div><div class="label">总行数</div></div>' +
-        '<div class="stat-box"><div class="num"><span class="snum">' + uniqueBuyers.size.toLocaleString() + '</span></div><div class="label">去重后用户数</div></div>' +
-        '<div class="stat-box"><div class="num"><span class="snum">' + tier1Count + '</span></div><div class="label">&#129351; 一等奖候选（&#8805;10单）</div></div>' +
-        '<div class="stat-box"><div class="num"><span class="snum">' + tier2Count + '</span></div><div class="label">&#129352; 二等奖候选（&#8805;5单）</div></div>';
+        '<div class="stat-box"><div class="num"><span class="snum" data-v="' + rawRows.length.toLocaleString() + '">****</span></div><div class="label">总行数</div></div>' +
+        '<div class="stat-box"><div class="num"><span class="snum" data-v="' + uniqueBuyers.size.toLocaleString() + '">****</span></div><div class="label">去重后用户数</div></div>' +
+        '<div class="stat-box"><div class="num"><span class="snum" data-v="' + tier1Count + '">****</span></div><div class="label">&#129351; 一等奖候选（&#8805;10单）</div></div>' +
+        '<div class="stat-box"><div class="num"><span class="snum" data-v="' + tier2Count + '">****</span></div><div class="label">&#129352; 二等奖候选（&#8805;5单）</div></div>';
+      applyNumVisibility();
 
       var previewCols = [];
       if (colBuyer) previewCols.push({ col: colBuyer, mask: 'id' });
@@ -439,25 +439,31 @@
       var tierLabel = currentTier === 'first' ? '一等奖候选人' : currentTier === 'second' ? '二等奖候选人' : '买家';
       var hint = '';
       if (poolSize > 0) {
-        var sn = '<span class="snum">' + poolSize + '</span>';
+        var sn = '<span class="snum" data-v="' + poolSize + '">****</span>';
         hint = poolSize < n ? '（' + tierLabel + '共 ' + sn + ' 人，将全部中奖）' : '（将从 ' + sn + ' 人中抽取）';
       } else {
         hint = '（无符合条件的候选人）';
       }
       document.getElementById('drawCountHint').innerHTML = hint;
+      applyNumVisibility();
       var tierPrefix = currentTier === 'first' ? '【一等奖】' : currentTier === 'second' ? '【二等奖】' : '';
       document.getElementById('drawBtn').textContent = tierPrefix + '开始抽奖（抽 ' + actual + ' 人）';
       document.getElementById('drawBtn').disabled = poolSize === 0;
     }
 
-    document.getElementById('statsToggleBtn').addEventListener('click', function() {
-      if (document.body.classList.contains('show-nums')) {
-        document.body.classList.remove('show-nums');
-        this.innerHTML = '&#128065; 显示数字';
-      } else {
-        document.body.classList.add('show-nums');
-        this.innerHTML = '&#128065; 隐藏数字';
+    var numsVisible = false;
+
+    function applyNumVisibility() {
+      var snums = document.querySelectorAll('.snum');
+      for (var i = 0; i < snums.length; i++) {
+        snums[i].textContent = numsVisible ? snums[i].getAttribute('data-v') : '****';
       }
+    }
+
+    document.getElementById('statsToggleBtn').addEventListener('click', function() {
+      numsVisible = !numsVisible;
+      applyNumVisibility();
+      this.innerHTML = numsVisible ? '&#128065; 隐藏数字' : '&#128065; 显示数字';
     });
 
     document.getElementById('drawBtn').addEventListener('click', doDraw);
