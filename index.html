@@ -111,6 +111,12 @@
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    function mask(s) {
+      s = String(s).trim();
+      if (s.length <= 6) return s.slice(0, 1) + '****';
+      return s.slice(0, 3) + '****' + s.slice(-4);
+    }
+
     function getDrawCount() {
       var el = document.getElementById('drawCount');
       return Math.max(1, parseInt(el ? el.value : '10') || 10);
@@ -254,7 +260,7 @@
       var preview = rawRows.slice(0, 50);
       for (var i = 0; i < preview.length; i++) {
         var r = preview[i];
-        bodyHtml += '<tr><td>' + esc(String(r[colOrder])) + '</td><td>' + esc(String(r[colBuyer])) + '</td><td>' + esc(String(r[colNickname])) + '</td><td>' + esc(String(r[colAmt])) + '</td></tr>';
+        bodyHtml += '<tr><td>' + esc(String(r[colOrder])) + '</td><td>' + esc(mask(r[colBuyer])) + '</td><td>' + esc(String(r[colNickname])) + '</td><td>' + esc(String(r[colAmt])) + '</td></tr>';
       }
       document.getElementById('previewBody').innerHTML = bodyHtml;
 
@@ -308,9 +314,9 @@
         var html = '<div class="winner-rank">&#127881; 第 ' + (i + 1) + ' 名</div>';
         if (nickname) {
           html += '<div class="winner-buyer">' + esc(nickname) + '</div>';
-          html += '<div class="winner-order" style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：' + esc(String(w[colBuyer])) + '</div>';
+          html += '<div class="winner-order" style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：' + esc(mask(w[colBuyer])) + '</div>';
         } else {
-          html += '<div class="winner-buyer">买家：' + esc(String(w[colBuyer])) + '</div>';
+          html += '<div class="winner-buyer">买家：' + esc(mask(w[colBuyer])) + '</div>';
         }
         html += '<div class="winner-order">订单：' + esc(String(w[colOrder])) + '</div>';
         html += '<div class="winner-amount">金额：' + esc(String(w[colAmt])) + '</div>';
