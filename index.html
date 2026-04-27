@@ -44,6 +44,9 @@
     .export-btn:hover { background: rgba(255,255,255,0.15); }
     .hidden { display: none !important; }
     .tip { font-size: 0.8rem; color: #a0b4c8; margin-top: 8px; }
+    .snum { filter: blur(6px); display: inline-block; user-select: none; transition: filter 0.3s; }
+    body.show-nums .snum { filter: none; user-select: auto; }
+    .stats-toggle-btn { font-size: 0.78rem; padding: 4px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #a0b4c8; cursor: pointer; }
     .tier-btn { padding: 8px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #a0b4c8; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
     .tier-btn:hover { background: rgba(255,255,255,0.1); }
     .tier-active { background: rgba(240,192,64,0.2) !important; border-color: #f0c040 !important; color: #f0c040 !important; }
@@ -70,7 +73,10 @@
   </div>
 
   <div class="card hidden" id="previewCard">
-    <h2>第三步 · 数据预览</h2>
+    <h2 style="display:flex;justify-content:space-between;align-items:center">
+      <span>第三步 · 数据预览</span>
+      <button class="stats-toggle-btn" id="statsToggleBtn">&#128065; 显示数字</button>
+    </h2>
     <div class="stats" id="stats"></div>
     <div class="table-wrap" style="margin-top:16px">
       <table><thead><tr id="previewHead"></tr></thead><tbody id="previewBody"></tbody></table>
@@ -387,10 +393,10 @@
       }
 
       document.getElementById('stats').innerHTML =
-        '<div class="stat-box"><div class="num">' + rawRows.length.toLocaleString() + '</div><div class="label">总行数</div></div>' +
-        '<div class="stat-box"><div class="num">' + uniqueBuyers.size.toLocaleString() + '</div><div class="label">去重后用户数</div></div>' +
-        '<div class="stat-box"><div class="num">' + tier1Count + '</div><div class="label">&#129351; 一等奖候选（&#8805;10单）</div></div>' +
-        '<div class="stat-box"><div class="num">' + tier2Count + '</div><div class="label">&#129352; 二等奖候选（&#8805;5单）</div></div>';
+        '<div class="stat-box"><div class="num"><span class="snum">' + rawRows.length.toLocaleString() + '</span></div><div class="label">总行数</div></div>' +
+        '<div class="stat-box"><div class="num"><span class="snum">' + uniqueBuyers.size.toLocaleString() + '</span></div><div class="label">去重后用户数</div></div>' +
+        '<div class="stat-box"><div class="num"><span class="snum">' + tier1Count + '</span></div><div class="label">&#129351; 一等奖候选（&#8805;10单）</div></div>' +
+        '<div class="stat-box"><div class="num"><span class="snum">' + tier2Count + '</span></div><div class="label">&#129352; 二等奖候选（&#8805;5单）</div></div>';
 
       var previewCols = [];
       if (colBuyer) previewCols.push({ col: colBuyer, mask: 'id' });
@@ -433,15 +439,26 @@
       var tierLabel = currentTier === 'first' ? '一等奖候选人' : currentTier === 'second' ? '二等奖候选人' : '买家';
       var hint = '';
       if (poolSize > 0) {
-        hint = poolSize < n ? '（' + tierLabel + '共 ' + poolSize + ' 人，将全部中奖）' : '（将从 ' + poolSize + ' 人中抽取）';
+        var sn = '<span class="snum">' + poolSize + '</span>';
+        hint = poolSize < n ? '（' + tierLabel + '共 ' + sn + ' 人，将全部中奖）' : '（将从 ' + sn + ' 人中抽取）';
       } else {
         hint = '（无符合条件的候选人）';
       }
-      document.getElementById('drawCountHint').textContent = hint;
+      document.getElementById('drawCountHint').innerHTML = hint;
       var tierPrefix = currentTier === 'first' ? '【一等奖】' : currentTier === 'second' ? '【二等奖】' : '';
       document.getElementById('drawBtn').textContent = tierPrefix + '开始抽奖（抽 ' + actual + ' 人）';
       document.getElementById('drawBtn').disabled = poolSize === 0;
     }
+
+    document.getElementById('statsToggleBtn').addEventListener('click', function() {
+      if (document.body.classList.contains('show-nums')) {
+        document.body.classList.remove('show-nums');
+        this.innerHTML = '&#128065; 显示数字';
+      } else {
+        document.body.classList.add('show-nums');
+        this.innerHTML = '&#128065; 隐藏数字';
+      }
+    });
 
     document.getElementById('drawBtn').addEventListener('click', doDraw);
     document.getElementById('redrawBtn').addEventListener('click', doDraw);
