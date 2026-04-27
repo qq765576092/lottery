@@ -111,10 +111,18 @@
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function mask(s) {
+    function maskId(s) {
       s = String(s).trim();
       if (s.length <= 6) return s.slice(0, 1) + '****';
       return s.slice(0, 3) + '****' + s.slice(-4);
+    }
+
+    function maskName(s) {
+      s = String(s).trim();
+      if (!s) return s;
+      if (s.length === 1) return '*';
+      if (s.length === 2) return s.slice(0, 1) + '*';
+      return s.slice(0, 1) + '**' + s.slice(-1);
     }
 
     function getDrawCount() {
@@ -212,10 +220,22 @@
         }
         document.getElementById(ids[i]).innerHTML = html;
       }
-      autoSelect('colOrderId',  ['订单id', 'order_id', '订单号', 'orderid', '单号']);
-      autoSelect('colBuyerId',  ['买家id', 'buyer_id', '用户id', 'userid', '买家', '用户', '会员id']);
-      autoSelect('colNickname', ['昵称', 'nickname', '用户昵称', '买家昵称', '姓名', '用户名']);
-      autoSelect('colAmount',   ['金额', '订单金额', 'amount', 'price', '付款金额', '实付金额', '支付金额']);
+      autoSelect('colOrderId',
+        ['订单id', '订单ID', 'order_id', 'orderid', '订单号', '单号', '流水号', '交易号', '订单编号'],
+        ['订单', 'order', '流水', '交易', '编号', '单号']
+      );
+      autoSelect('colBuyerId',
+        ['买家id', '买家ID', 'buyer_id', 'buyerid', '用户id', '用户ID', 'userid', 'user_id', '会员id', '会员ID', '客户id'],
+        ['买家id', '用户id', '会员id', 'userid', 'buyerid', '买家', '用户', '会员', '客户']
+      );
+      autoSelect('colNickname',
+        ['user_name', 'username', '昵称', '用户昵称', '买家昵称', 'nickname', '用户名', '姓名'],
+        ['user_name', 'username', '昵称', 'nickname', '用户名', '姓名', 'name']
+      );
+      autoSelect('colAmount',
+        ['支付金额', '实付金额', '付款金额', '订单金额', '金额', 'amount', 'price', '支付金额(元)', '实付款'],
+        ['支付金额', '实付', '付款', '订单金额', '金额', 'amount', 'price', '费用', '消费']
+      );
       document.getElementById('mappingCard').classList.remove('hidden');
       var changeIds = ['colOrderId', 'colBuyerId', 'colNickname', 'colAmount'];
       for (var i = 0; i < changeIds.length; i++) {
@@ -224,13 +244,22 @@
       refreshPreview();
     }
 
-    function autoSelect(selId, keywords) {
+    function autoSelect(selId, exactWords, fuzzyWords) {
       var sel = document.getElementById(selId);
       var lc = [];
-      for (var i = 0; i < headers.length; i++) lc.push(headers[i].toLowerCase());
-      for (var k = 0; k < keywords.length; k++) {
+      for (var i = 0; i < headers.length; i++) lc.push(headers[i].toLowerCase().replace(/\s/g, ''));
+      // 第一轮：精确完整匹配
+      for (var k = 0; k < exactWords.length; k++) {
+        var kw = exactWords[k].toLowerCase().replace(/\s/g, '');
         for (var i = 0; i < lc.length; i++) {
-          if (lc[i].indexOf(keywords[k].toLowerCase()) !== -1) { sel.selectedIndex = i; return; }
+          if (lc[i] === kw) { sel.selectedIndex = i; return; }
+        }
+      }
+      // 第二轮：包含匹配（按关键词顺序，越靠前优先级越高）
+      for (var k = 0; k < fuzzyWords.length; k++) {
+        var kw = fuzzyWords[k].toLowerCase().replace(/\s/g, '');
+        for (var i = 0; i < lc.length; i++) {
+          if (lc[i].indexOf(kw) !== -1) { sel.selectedIndex = i; return; }
         }
       }
     }
@@ -260,7 +289,7 @@
       var preview = rawRows.slice(0, 50);
       for (var i = 0; i < preview.length; i++) {
         var r = preview[i];
-        bodyHtml += '<tr><td>' + esc(String(r[colOrder])) + '</td><td>' + esc(mask(r[colBuyer])) + '</td><td>' + esc(String(r[colNickname])) + '</td><td>' + esc(String(r[colAmt])) + '</td></tr>';
+        bodyHtml += '<tr><td>' + esc(String(r[colOrder])) + '</td><td>' + esc(maskId(r[colBuyer])) + '</td><td>' + esc(maskName(r[colNickname])) + '</td><td>' + esc(String(r[colAmt])) + '</td></tr>';
       }
       document.getElementById('previewBody').innerHTML = bodyHtml;
 
@@ -313,10 +342,10 @@
         var nickname = String(w[colNickname]).trim();
         var html = '<div class="winner-rank">&#127881; 第 ' + (i + 1) + ' 名</div>';
         if (nickname) {
-          html += '<div class="winner-buyer">' + esc(nickname) + '</div>';
-          html += '<div class="winner-order" style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：' + esc(mask(w[colBuyer])) + '</div>';
+          html += '<div class="winner-buyer">' + esc(maskName(nickname)) + '</div>';
+          html += '<div class="winner-order" style="font-size:0.8rem;color:#a0b4c8;margin-top:2px">ID：' + esc(maskId(w[colBuyer])) + '</div>';
         } else {
-          html += '<div class="winner-buyer">买家：' + esc(mask(w[colBuyer])) + '</div>';
+          html += '<div class="winner-buyer">买家：' + esc(maskId(w[colBuyer])) + '</div>';
         }
         html += '<div class="winner-order">订单：' + esc(String(w[colOrder])) + '</div>';
         html += '<div class="winner-amount">金额：' + esc(String(w[colAmt])) + '</div>';
